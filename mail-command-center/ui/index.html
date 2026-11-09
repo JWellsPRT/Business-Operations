@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+  <title>Mail Command Center</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside id="sidebar">
+    <div class="brand">
+      <span class="brand-mark">✉</span>
+      <div>
+        <div class="brand-name">Command Center</div>
+        <div class="brand-sub" id="total-unread">No unread</div>
+      </div>
+    </div>
+
+    <button id="btn-overview" class="nav-item overview">
+      <span class="grid-icon"></span> Overview
+    </button>
+
+    <div class="section-label">Accounts</div>
+    <ul id="account-list"></ul>
+
+    <button id="btn-add" class="add-btn">+ Add account</button>
+
+    <div id="update-banner" hidden>
+      <div><strong>Update ready</strong><span id="update-version"></span></div>
+      <button id="btn-update" class="primary">Restart to update</button>
+    </div>
+
+    <div class="sidebar-footer">
+      <label for="zoom">Tile zoom <span id="zoom-val"></span></label>
+      <input id="zoom" type="range" min="0.4" max="1" step="0.05" />
+    </div>
+  </aside>
+
+  <main id="main">
+    <div id="tiles"></div>
+    <div id="empty" hidden>
+      <div class="empty-card">
+        <h1>Add your first inbox</h1>
+        <p>Each account gets its own isolated browser session, so you can stay signed in to all of them at once.</p>
+        <button id="btn-add-empty" class="primary">+ Add account</button>
+      </div>
+    </div>
+  </main>
+
+  <div id="modal-backdrop" hidden>
+    <form id="modal" autocomplete="off">
+      <h2 id="modal-title">Add account</h2>
+      <label>Label
+        <input id="f-label" placeholder="e.g. Sales, Personal, Support" required />
+      </label>
+      <label>Gmail address
+        <input id="f-email" type="email" placeholder="you@gmail.com" spellcheck="false" />
+      </label>
+      <label>Password <span class="opt">optional · fills Google's sign-in page for you</span>
+        <input id="f-password" type="password" autocomplete="new-password" />
+      </label>
+      <label class="check" id="f-forget-row" hidden><input type="checkbox" id="f-forget" /> Forget the saved password</label>
+      <div class="secure-note" id="f-secure-note"></div>
+      <label>Color</label>
+      <div id="f-colors"></div>
+      <div class="modal-actions">
+        <button type="button" id="f-delete" class="danger" hidden>Remove…</button>
+        <span class="spacer"></span>
+        <button type="button" id="f-cancel">Cancel</button>
+        <button type="submit" class="primary" id="f-save">Add</button>
+      </div>
+      <div id="f-delete-confirm" hidden>
+        <p>Remove this account from the command center?</p>
+        <label class="check"><input type="checkbox" id="f-clear" checked /> Also sign out and delete its saved session</label>
+        <div class="modal-actions">
+          <span class="spacer"></span>
+          <button type="button" id="f-delete-no">Keep it</button>
+          <button type="button" id="f-delete-yes" class="danger">Remove</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

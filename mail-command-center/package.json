@@ -1,0 +1,65 @@
+{
+  "name": "gmail-command-center",
+  "productName": "Mail Command Center",
+  "version": "1.2.0",
+  "description": "One window, many Gmail accounts. Live tiles that expand on click.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "@electron/fuses": "^1.8.0",
+    "electron": "33.2.1",
+    "electron-builder": "^25.1.8",
+    "resedit": "^2.0.3"
+  },
+  "author": "Pacific Rim Tonewoods",
+  "build": {
+    "appId": "com.mailcommandcenter.app",
+    "productName": "Mail Command Center",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "credentials.js",
+      "updater.js",
+      "ui/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "afterPack": "build/after-pack.js",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Mail Command Center",
+      "artifactName": "Mail-Command-Center-Setup-${version}.exe",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
+    "publish": null
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
