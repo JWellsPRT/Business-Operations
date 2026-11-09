@@ -1,6 +1,6 @@
 # Mail Command Center
 
-One window for all your Gmail accounts. Each account is a live tile. Click a tile to expand it, and click Overview (or the ⤡ button) to return to the grid.
+One window for all your Gmail accounts. Pick an account in the sidebar to open it; the app remembers which one you had open.
 
 Each account runs in its own isolated, persistent browser session, so every account stays signed in at the same time.
 

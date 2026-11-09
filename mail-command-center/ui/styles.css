@@ -65,39 +65,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .badge.zero { background: transparent; color: var(--muted); font-weight: 400; }
 li.dragging { opacity: .4; }
 li.drop-target .nav-item { box-shadow: inset 0 2px 0 var(--accent); }
-.grid-icon {
-  width: 12px; height: 12px; flex: none;
-  background:
-    linear-gradient(var(--text) 0 0) 0 0 / 5px 5px no-repeat,
-    linear-gradient(var(--text) 0 0) 7px 0 / 5px 5px no-repeat,
-    linear-gradient(var(--text) 0 0) 0 7px / 5px 5px no-repeat,
-    linear-gradient(var(--text) 0 0) 7px 7px / 5px 5px no-repeat;
-  opacity: .8;
-}
 .add-btn {
   margin-top: 6px; padding: 8px 10px; border-radius: 8px;
   border: 1px dashed var(--line); background: transparent; color: var(--muted);
 }
 .add-btn:hover { color: var(--text); border-color: var(--muted); }
-.sidebar-footer { border-top: 1px solid var(--line); margin-top: 10px; padding: 12px 8px 0; color: var(--muted); font-size: 12px; }
-.sidebar-footer input { width: 100%; accent-color: var(--accent); }
-.hint { margin-top: 8px; font-size: 11px; }
 
 /* ---------- Tiles ---------- */
 #main { flex: 1; min-width: 0; position: relative; padding: 10px; }
-#tiles {
-  height: 100%;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
-  grid-auto-rows: minmax(0, 1fr);
-}
+#tiles { height: 100%; display: flex; flex-direction: column; }
+#tiles .tile { flex: 1; }
+.tile[hidden] { display: none; }
 .tile {
   display: flex; flex-direction: column; min-height: 0;
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   overflow: hidden; transition: border-color .15s;
 }
-.tile.focused { border-color: var(--tile-color, var(--accent)); }
 .tile-head {
   height: var(--tile-head); flex: none; display: flex; align-items: center; gap: 8px;
   padding: 0 6px 0 10px; border-top: 3px solid var(--tile-color, var(--accent));
@@ -118,12 +101,6 @@ li.drop-target .nav-item { box-shadow: inset 0 2px 0 var(--accent); }
   background: var(--panel-2); color: var(--muted); padding: 20px; text-align: center;
 }
 
-/* Expanded mode: one tile fills the area */
-body.expanded #tiles { grid-template-columns: 1fr; grid-auto-rows: 1fr; }
-body.expanded .tile:not(.expanded-tile) { display: none; }
-.only-expanded { display: none; }
-body.expanded .only-expanded { display: grid; }
-body.expanded .only-grid { display: none; }
 
 /* ---------- Empty state ---------- */
 #empty { position: absolute; inset: 0; display: grid; place-items: center; }

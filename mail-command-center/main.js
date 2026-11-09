@@ -19,11 +19,11 @@ app.userAgentFallback = app.userAgentFallback
 
 const storePath = () => path.join(app.getPath('userData'), 'accounts.json');
 
-let state = { accounts: [], gridZoom: 0.7 };
+let state = { accounts: [] };
 let win = null;
 const views = new Map(); // id -> { view, visible }
 let modalOpen = false;
-let lastLayout = { mode: 'grid', rects: {} };
+let lastLayout = { rects: {} };
 
 function load() {
   try {
@@ -127,7 +127,6 @@ function createView(account) {
   };
   const unreadTimer = setInterval(pollUnread, 5000);
   wc.on('destroyed', () => clearInterval(unreadTimer));
-  wc.on('focus', () => send('account:focused', account.id));
   wc.on('did-fail-load', (_e, code, desc, url, isMain) => {
     if (isMain && code !== -3) send('account:update', { id: account.id, error: desc });
   });
@@ -149,7 +148,7 @@ function updateBadge(id, n) {
 }
 
 function applyLayout() {
-  const { mode, rects } = lastLayout;
+  const { rects } = lastLayout;
   for (const [id, { view }] of views) {
     const r = rects[id];
     if (!r || modalOpen || r.width < 2 || r.height < 2) {
@@ -160,7 +159,6 @@ function applyLayout() {
       x: Math.round(r.x), y: Math.round(r.y),
       width: Math.round(r.width), height: Math.round(r.height),
     });
-    view.webContents.setZoomFactor(mode === 'grid' ? state.gridZoom : 1);
     view.setVisible(true);
   }
 }
@@ -258,13 +256,6 @@ ipcMain.handle('accounts:reorder', (_e, ids) => {
   const byId = Object.fromEntries(state.accounts.map((a) => [a.id, a]));
   state.accounts = ids.map((id) => byId[id]).filter(Boolean);
   save();
-  return uiState();
-});
-
-ipcMain.handle('settings:gridZoom', (_e, z) => {
-  state.gridZoom = Math.min(1, Math.max(0.4, z));
-  save();
-  applyLayout();
   return uiState();
 });
 
