@@ -3,14 +3,11 @@
 # Trigger: push a tag like  mcc-v1.2.0
 #   git tag mcc-v1.2.0 && git push origin mcc-v1.2.0
 #
-# The installed apps check MCC_UPDATE_URL for latest.yml and update themselves.
+# Publishes the installer as a GitHub Release in this repo. Installed apps check
+# this repo's latest release and update themselves. That works without any token
+# in the app because this repo is public.
 #
-# One-time setup (repo Settings → Secrets and variables → Actions):
-#   secrets.CLOUDFLARE_API_TOKEN   token with "Workers R2 Storage: Edit"
-#   secrets.CLOUDFLARE_ACCOUNT_ID  your Cloudflare account ID
-#   vars.MCC_R2_BUCKET             R2 bucket name, e.g. mail-command-center-updates
-#   vars.MCC_UPDATE_URL            public URL of that bucket + /mail-command-center
-#                                  e.g. https://pub-xxxxxxxx.r2.dev/mail-command-center
+# No setup needed: it uses the built-in GITHUB_TOKEN.
 
 name: Mail Command Center release
 
@@ -19,7 +16,7 @@ on:
     tags: ['mcc-v*']
 
 permissions:
-  contents: write # to create the GitHub Release
+  contents: write # create the release and upload the installer
 
 concurrency:
   group: mcc-release
@@ -33,22 +30,14 @@ jobs:
         shell: bash
         working-directory: mail-command-center
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      MCC_R2_BUCKET: ${{ vars.MCC_R2_BUCKET }}
-      MCC_UPDATE_URL: ${{ vars.MCC_UPDATE_URL }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check configuration
+      - name: Check repo is public
         run: |
-          missing=""
-          [ -n "$CLOUDFLARE_API_TOKEN" ]  || missing="$missing secrets.CLOUDFLARE_API_TOKEN"
-          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing secrets.CLOUDFLARE_ACCOUNT_ID"
-          [ -n "$MCC_R2_BUCKET" ]         || missing="$missing vars.MCC_R2_BUCKET"
-          [ -n "$MCC_UPDATE_URL" ]        || missing="$missing vars.MCC_UPDATE_URL"
-          if [ -n "$missing" ]; then echo "::error::Missing repo settings:$missing"; exit 1; fi
-          case "$MCC_UPDATE_URL" in https://*) ;; *) echo "::error::MCC_UPDATE_URL must start with https://"; exit 1;; esac
+          vis=$(gh repo view "$GITHUB_REPOSITORY" --json visibility -q .visibility)
+          [ "$vis" = "PUBLIC" ] || { echo "::error::$GITHUB_REPOSITORY is $vis. Installed apps can only download updates from a public repo."; exit 1; }
 
       - name: Set version from tag
         id: version
@@ -67,10 +56,12 @@ jobs:
       - run: npm ci
 
       - name: Build installer
-        run: >
-          npx electron-builder --win --x64 --publish never
-          -c.publish.provider=generic
-          -c.publish.url="$MCC_UPDATE_URL"
+        run: |
+          npx electron-builder --win --x64 --publish never \
+            -c.publish.provider=github \
+            -c.publish.owner="${GITHUB_REPOSITORY%%/*}" \
+            -c.publish.repo="${GITHUB_REPOSITORY##*/}" \
+            -c.publish.releaseType=release
 
       - name: Verify build
         run: |
@@ -79,22 +70,17 @@ jobs:
           test -f "dist/Mail-Command-Center-Setup-$V.exe"
           test -f "dist/Mail-Command-Center-Setup-$V.exe.blockmap"
           grep -q "version: $V" dist/latest.yml
-          grep -q "$MCC_UPDATE_URL" "dist/win-unpacked/resources/app-update.yml"
+          grep -qi "repo: ${GITHUB_REPOSITORY##*/}" dist/win-unpacked/resources/app-update.yml
 
-      - name: Upload to R2
-        # Installer first, latest.yml last, so apps never see a manifest
-        # pointing at a file that isn't there yet.
+      - name: Publish release
+        # Created as a draft, then published once every file is uploaded, so
+        # apps never see a release with its installer missing.
         run: |
           V="${{ steps.version.outputs.version }}"
-          put() { npx -y wrangler@3.99.0 r2 object put "$MCC_R2_BUCKET/mail-command-center/$1" --file "dist/$1" "${@:2}"; }
-          put "Mail-Command-Center-Setup-$V.exe"          --content-type application/vnd.microsoft.portable-executable
-          put "Mail-Command-Center-Setup-$V.exe.blockmap" --content-type application/octet-stream
-          put "latest.yml" --content-type text/yaml --cache-control "no-cache, max-age=0"
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          V="${{ steps.version.outputs.version }}"
-          gh release create "$GITHUB_REF_NAME" "dist/Mail-Command-Center-Setup-$V.exe" \
-            --title "Mail Command Center $V" --generate-notes
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
+            --title "Mail Command Center $V" --generate-notes \
+            "dist/Mail-Command-Center-Setup-$V.exe" \
+            "dist/Mail-Command-Center-Setup-$V.exe.blockmap" \
+            "dist/latest.yml"
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+          echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"

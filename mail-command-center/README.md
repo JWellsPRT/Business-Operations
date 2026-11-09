@@ -22,28 +22,14 @@ Accounts and settings are stored in `%APPDATA%\Mail Command Center` and are kept
        git tag mcc-v1.2.1
        git push origin mcc-v1.2.1
 
-3. GitHub Actions (`.github/workflows/mail-command-center-release.yml`) builds the installer on Windows, uploads it to Cloudflare R2, and creates a GitHub Release. Installed apps pick it up within 4 hours, or on their next launch.
+3. GitHub Actions (`.github/workflows/mail-command-center-release.yml`) builds the installer on Windows and publishes it as this repo's latest GitHub Release. Installed apps pick it up within 4 hours, or on their next launch.
 
 Tags must look like `mcc-vMAJOR.MINOR.PATCH`, and each release needs a higher version than the last.
 
-### One-time setup
-
-In Cloudflare:
-
-1. **R2 → Create bucket.** Use any name, for example `mail-command-center-updates`.
-2. In the bucket's **Settings → Public access**, turn on the **R2.dev subdomain** (or connect a custom domain). Note the public URL, e.g. `https://pub-xxxxxxxx.r2.dev`.
-3. **My Profile → API Tokens → Create Token**, with the permission **Account → Workers R2 Storage → Edit**.
-
-In GitHub (this repo → **Settings → Secrets and variables → Actions**):
-
-| Kind | Name | Value |
-|------|------|-------|
-| Secret | `CLOUDFLARE_API_TOKEN` | the token from step 3 |
-| Secret | `CLOUDFLARE_ACCOUNT_ID` | your Cloudflare account ID (shown on the R2 overview page) |
-| Variable | `MCC_R2_BUCKET` | the bucket name |
-| Variable | `MCC_UPDATE_URL` | the public URL **plus** `/mail-command-center`, e.g. `https://pub-xxxxxxxx.r2.dev/mail-command-center` |
-
-The installers in the bucket can be downloaded by anyone who has the URL. They contain no secrets: passwords and accounts live only on each PC.
+Notes:
+- **This repo must stay public.** Installed apps download updates from its Releases page without a login. The workflow refuses to publish if the repo is private.
+- **Only Mail Command Center releases should be marked "Latest".** The app checks the repo's latest release. If you add other tools here later, publish their releases with "Set as the latest release" unticked (`gh release create --latest=false`).
+- The installers contain no secrets. Passwords and accounts live only on each PC.
 
 ## Install
 
