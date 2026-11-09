@@ -35,14 +35,26 @@ function save() {
   fs.writeFileSync(storePath(), JSON.stringify(state, null, 2));
 }
 
-// Reads the unread number next to "Inbox" in Gmail's left menu, or null if
-// the menu isn't on the page. Its aria-label is "Inbox 339 unread", or just
-// "Inbox" when there are none.
+// Reads the unread number next to "Inbox" in Gmail's left menu. Returns a
+// number, or null when it can't tell (the caller then keeps the last count).
+//
+// Several links on the page point at #inbox (the Gmail logo, for one), so only
+// the link whose label starts with "Inbox" counts. Its label is
+// "Inbox 339 unread", or exactly "Inbox" when there are none. If the label
+// has no number, fall back to the count Gmail shows beside it in the row.
 const INBOX_COUNT_PROBE = `(() => {
-  const a = document.querySelector('a[href$="#inbox"][aria-label]');
-  if (!a) return null;
-  const m = a.getAttribute('aria-label').match(/(\\d[\\d,.]*)/);
-  return m ? parseInt(m[1].replace(/[,.]/g, ''), 10) : 0;
+  const toInt = (s) => parseInt(s.replace(/[,.\\s]/g, ''), 10);
+  const label = (a) => (a.getAttribute('aria-label') || '').trim();
+  const row = [...document.querySelectorAll('a[href$="#inbox"]')]
+    .find((a) => /^inbox\\b/i.test(label(a) || a.textContent.trim()));
+  if (!row) return null;
+  const m = label(row).match(/^inbox\\D*?(\\d[\\d,.\\s]*)/i);
+  if (m) return toInt(m[1]);
+  const box = row.closest('[role="listitem"], [data-tooltip]') || row.parentElement;
+  const t = (box ? box.textContent : row.textContent).replace(/\\s+/g, ' ').trim();
+  const n = t.match(/^inbox\\s*(\\d[\\d,.]*)/i);
+  if (n) return toInt(n[1]);
+  return /^inbox$/i.test(label(row)) || /^inbox$/i.test(t) ? 0 : null;
 })()`;
 
 const partitionFor = (id) => `persist:acct-${id}`;
