@@ -1,7 +1,10 @@
 # Builds and publishes a Mail Command Center release.
 #
-# Trigger: push a tag like  mcc-v1.2.0
-#   git tag mcc-v1.2.0 && git push origin mcc-v1.2.0
+# Two ways to release:
+#   - Actions tab → "Mail Command Center release" → Run workflow → enter a
+#     version like 1.2.1 (run it from the main branch). The workflow creates
+#     the mcc-v1.2.1 tag itself.
+#   - Or push a tag:  git tag mcc-v1.2.1 && git push origin mcc-v1.2.1
 #
 # Publishes the installer as a GitHub Release in this repo. Installed apps check
 # this repo's latest release and update themselves. That works without any token
@@ -14,6 +17,11 @@ name: Mail Command Center release
 on:
   push:
     tags: ['mcc-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.2.1 (must be higher than the last release)'
+        required: true
 
 permissions:
   contents: write # create the release and upload the installer
@@ -39,13 +47,25 @@ jobs:
           vis=$(gh repo view "$GITHUB_REPOSITORY" --json visibility -q .visibility)
           [ "$vis" = "PUBLIC" ] || { echo "::error::$GITHUB_REPOSITORY is $vis. Installed apps can only download updates from a public repo."; exit 1; }
 
-      - name: Set version from tag
+      - name: Work out version and tag
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          VERSION="${GITHUB_REF_NAME#mcc-v}"
-          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Tag must look like mcc-v1.2.3"; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::Run this workflow from the main branch"; exit 1; }
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="${GITHUB_REF_NAME#mcc-v}"
+          fi
+          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Version must look like 1.2.3"; exit 1; }
+          TAG="mcc-v$VERSION"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::$TAG already exists. Pick a higher version."; exit 1
+          fi
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -77,10 +97,13 @@ jobs:
         # apps never see a release with its installer missing.
         run: |
           V="${{ steps.version.outputs.version }}"
-          gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
+          TAG="${{ steps.version.outputs.tag }}"
+          # --target creates the tag at this commit if it doesn't exist yet
+          # (Run workflow); for a pushed tag it's already there.
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" \
             --title "Mail Command Center $V" --generate-notes \
             "dist/Mail-Command-Center-Setup-$V.exe" \
             "dist/Mail-Command-Center-Setup-$V.exe.blockmap" \
             "dist/latest.yml"
-          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
-          echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"
+          gh release edit "$TAG" --draft=false --latest
+          echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

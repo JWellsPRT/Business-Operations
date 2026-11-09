@@ -16,15 +16,13 @@ Accounts and settings are stored in `%APPDATA%\Mail Command Center` and are kept
 
 ## Releasing an update
 
-1. Commit your change. You don't need to edit the version number: it comes from the tag.
-2. Tag and push:
+1. Commit your change to `main`. You don't need to edit the version number.
+2. On GitHub, open **Actions → Mail Command Center release → Run workflow**, leave the branch on `main`, enter the new version (for example `1.2.1`), and click **Run workflow**.
 
-       git tag mcc-v1.2.1
-       git push origin mcc-v1.2.1
+   Alternatively, push a tag: `git tag mcc-v1.2.1 && git push origin mcc-v1.2.1`.
+3. The workflow builds the installer on Windows, creates the `mcc-v1.2.1` tag, and publishes it as this repo's latest GitHub Release. Installed apps pick it up within 4 hours, or on their next launch.
 
-3. GitHub Actions (`.github/workflows/mail-command-center-release.yml`) builds the installer on Windows and publishes it as this repo's latest GitHub Release. Installed apps pick it up within 4 hours, or on their next launch.
-
-Tags must look like `mcc-vMAJOR.MINOR.PATCH`, and each release needs a higher version than the last.
+Versions look like `MAJOR.MINOR.PATCH`, and each release needs a higher version than the last.
 
 Notes:
 - **This repo must stay public.** Installed apps download updates from its Releases page without a login. The workflow refuses to publish if the repo is private.
