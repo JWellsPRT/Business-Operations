@@ -10,8 +10,9 @@ contextBridge.exposeInMainWorld('mcc', {
   modal: (open) => ipcRenderer.send('modal', open),
   action: (id, action) => ipcRenderer.send('view:action', { id, action }),
   installUpdate: () => ipcRenderer.send('update:install'),
+  openUpdatePage: () => ipcRenderer.send('update:open'),
   on: (channel, fn) => {
-    const ok = ['account:update', 'nav', 'update:ready'];
+    const ok = ['account:update', 'nav', 'update:ready', 'update:available'];
     if (ok.includes(channel)) ipcRenderer.on(channel, (_e, p) => fn(p));
   },
 });

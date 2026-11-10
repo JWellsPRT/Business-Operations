@@ -1,13 +1,33 @@
-// electron-builder afterPack hook:
-//  1. sets the .exe icon and version info with resedit (pure JS, no Wine needed)
-//  2. flips Electron's security fuses (cookie encryption on, debugging back doors off)
+// electron-builder afterPack hook.
+//  Windows: sets the .exe icon and version info with resedit (pure JS, no Wine
+//           needed), fixes the asar integrity path, then flips the security fuses.
+//  macOS:   flips the security fuses, then re-applies an ad-hoc signature. The
+//           app is not signed with an Apple certificate, but Apple Silicon Macs
+//           refuse to run a modified binary without at least an ad-hoc signature.
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 const path = require('path');
 const ResEdit = require('resedit');
 
 exports.default = async (ctx) => {
-  if (ctx.electronPlatformName !== 'win32') return;
+  if (ctx.electronPlatformName === 'win32') return packWindows(ctx);
+  if (ctx.electronPlatformName === 'darwin') return packMac(ctx);
+};
+
+async function packMac(ctx) {
+  const appPath = path.join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`);
+  await flip(appPath);
+  if (process.platform !== 'darwin') {
+    console.warn('  • not on macOS: skipped ad-hoc signing (this build will not run on Apple Silicon)');
+    return;
+  }
+  execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], { stdio: 'inherit' });
+  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'inherit' });
+  console.log(`  • ad-hoc signed ${path.basename(appPath)} (${ctx.arch === 3 ? 'arm64' : 'x64'})`);
+}
+
+async function packWindows(ctx) {
   const name = ctx.packager.appInfo.productFilename;
   const version = ctx.packager.appInfo.version;
   const exePath = path.join(ctx.appOutDir, `${name}.exe`);
@@ -46,14 +66,13 @@ exports.default = async (ctx) => {
   res.outputResource(exe);
   fs.writeFileSync(exePath, Buffer.from(exe.generate()));
   console.log(`  • set icon + version info on ${path.basename(exePath)}`);
-  await flip(ctx);
-};
+  await flip(exePath);
+}
 
-async function flip(ctx) {
-  const exePath = path.join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.exe`);
-  await flipFuses(exePath, {
+async function flip(target) {
+  await flipFuses(target, {
     version: FuseVersion.V1,
-    [FuseV1Options.EnableCookieEncryption]: true,              // encrypt cookies with DPAPI, like Chrome
+    [FuseV1Options.EnableCookieEncryption]: true,              // encrypt cookies (DPAPI on Windows, Keychain on macOS)
     [FuseV1Options.RunAsNode]: false,                          // block ELECTRON_RUN_AS_NODE abuse
     [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
     [FuseV1Options.EnableNodeCliInspectArguments]: false,      // no --inspect debugger attach

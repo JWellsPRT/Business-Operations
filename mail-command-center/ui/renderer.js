@@ -248,11 +248,22 @@ window.mcc.on('nav', (n) => {
 });
 
 // ---------- Updates ----------
+// Windows: the update is downloaded and installs on restart.
 window.mcc.on('update:ready', ({ version }) => {
+  $('#update-title').textContent = 'Update ready';
   $('#update-version').textContent = ` · version ${version}`;
+  $('#btn-update').textContent = 'Restart to update';
+  $('#btn-update').onclick = () => window.mcc.installUpdate();
   $('#update-banner').hidden = false;
 });
-$('#btn-update').onclick = () => window.mcc.installUpdate();
+// macOS: a newer version exists; the button opens the download page.
+window.mcc.on('update:available', ({ version }) => {
+  $('#update-title').textContent = `Version ${version} available`;
+  $('#update-version').textContent = '';
+  $('#btn-update').textContent = 'Download';
+  $('#btn-update').onclick = () => window.mcc.openUpdatePage();
+  $('#update-banner').hidden = false;
+});
 
 // ---------- Boot ----------
 (async () => {

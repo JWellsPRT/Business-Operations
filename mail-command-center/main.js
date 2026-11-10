@@ -216,7 +216,15 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
   win.on('page-title-updated', (e) => e.preventDefault()); // keep the unread total in the title
-  win.on('closed', () => { win = null; views.clear(); });
+  win.on('closed', () => {
+    // On macOS the app keeps running after its window closes, and a new window
+    // gets fresh views, so shut these accounts' pages down rather than leak them.
+    for (const { view } of views.values()) {
+      try { if (!view.webContents.isDestroyed()) view.webContents.close(); } catch { /* already gone */ }
+    }
+    views.clear();
+    win = null;
+  });
   for (const a of state.accounts) createView(a);
 }
 
