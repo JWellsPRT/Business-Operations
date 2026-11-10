@@ -114,7 +114,7 @@ jobs:
           grep -qi "repo: ${{ github.event.repository.name }}" dist/win-unpacked/resources/app-update.yml
           npx @electron/fuses read --app "dist/win-unpacked/Mail Command Center.exe" | tee fuses.txt
           grep -q "EnableCookieEncryption is Enabled" fuses.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows
           if-no-files-found: error
@@ -164,7 +164,7 @@ jobs:
           "$APP" > smoke.log 2>&1 & PID=$!
           sleep 20
           if kill -0 $PID 2>/dev/null; then echo "app is running"; kill $PID; else cat smoke.log; echo "::error::The Mac app exited on startup"; exit 1; fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: mac
           if-no-files-found: error
@@ -173,8 +173,9 @@ jobs:
             mail-command-center/dist/Mail-Command-Center-${{ needs.prepare.outputs.version }}-mac-x64.dmg
 
   publish:
+    # Runs on dry runs too, to check the collected files; only the final step
+    # that creates the release is skipped.
     needs: [prepare, build-windows, build-mac]
-    if: needs.prepare.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the release and upload the installers
@@ -183,11 +184,19 @@ jobs:
       V: ${{ needs.prepare.outputs.version }}
       TAG: ${{ needs.prepare.outputs.tag }}
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           path: dist
           merge-multiple: true
+      - name: Check all installers are here
+        run: |
+          ls -l dist
+          for f in "Mail-Command-Center-Setup-$V.exe" "Mail-Command-Center-Setup-$V.exe.blockmap" latest.yml \
+                   "Mail-Command-Center-$V-mac-arm64.dmg" "Mail-Command-Center-$V-mac-x64.dmg"; do
+            test -f "dist/$f" || { echo "::error::missing $f"; exit 1; }
+          done
       - name: Publish release
+        if: needs.prepare.outputs.publish == 'true'
         # Created as a draft, then published once every file is uploaded, so
         # apps never see a release with an installer missing.
         run: |
