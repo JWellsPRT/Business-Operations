@@ -62,6 +62,57 @@ const isGoogleHost = (u) => {
   try { return /(^|\.)google\.com$/.test(new URL(u).hostname); } catch { return false; }
 };
 
+// ---------- Links ----------
+// Gmail wraps links in emails as https://www.google.com/url?q=<real link>.
+// Unwrap them so the browser goes straight to the real page.
+function unwrapGoogleRedirect(u) {
+  try {
+    const x = new URL(u);
+    if (isGoogleHost(u) && x.pathname === '/url') {
+      const real = x.searchParams.get('q') || x.searchParams.get('url');
+      if (real && /^https?:\/\//i.test(real)) return real;
+    }
+  } catch { /* not a URL */ }
+  return u;
+}
+
+// Gmail's own pop-outs (compose, print, a message in its own window) and Google
+// sign-in need this account's session, so they always open inside the app.
+function staysInApp(u) {
+  if (u === '' || u === 'about:blank') return true;
+  try {
+    const h = new URL(u).hostname;
+    return h === 'mail.google.com' || h === 'accounts.google.com';
+  } catch { return false; }
+}
+
+// Only ordinary web and email links are handed to the system.
+const canOpenExternally = (u) => {
+  try { return ['http:', 'https:', 'mailto:'].includes(new URL(u).protocol); } catch { return false; }
+};
+
+const linksGoToBrowser = () => state.openLinksInBrowser !== false; // on unless turned off
+
+// Decide where a link opened from an account goes. Applied to the account's
+// view and to every window opened from it.
+function handleLinks(wc, account) {
+  wc.setWindowOpenHandler(({ url }) => {
+    const target = unwrapGoogleRedirect(url);
+    if (staysInApp(target) || (!linksGoToBrowser() && /^https?:/i.test(target))) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 1000, height: 800, autoHideMenuBar: true,
+          webPreferences: { partition: partitionFor(account.id) },
+        },
+      };
+    }
+    if (canOpenExternally(target)) shell.openExternal(target);
+    return { action: 'deny' };
+  });
+  wc.on('did-create-window', (child) => handleLinks(child.webContents, account));
+}
+
 const liveInfo = {}; // id -> latest { unread, email, error }, replayed to the UI on load
 
 function send(channel, payload) {
@@ -80,21 +131,7 @@ function createView(account) {
   view.setBackgroundColor('#ffffff');
   const wc = view.webContents;
 
-  // Links: Google pages (compose pop-outs, sign-in) open in an app window with
-  // the same session; everything else goes to the system browser.
-  wc.setWindowOpenHandler(({ url }) => {
-    if (url === 'about:blank' || isGoogleHost(url)) {
-      return {
-        action: 'allow',
-        overrideBrowserWindowOptions: {
-          width: 900, height: 750, autoHideMenuBar: true,
-          webPreferences: { partition: partitionFor(account.id) },
-        },
-      };
-    }
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
+  handleLinks(wc, account);
 
   const setUnread = (unread) => {
     if (unread === liveInfo[account.id]?.unread) return;
@@ -194,6 +231,12 @@ function buildMenu() {
     { role: 'editMenu' },
     { label: 'View', submenu: [
       { label: 'Reload account', accelerator: 'CmdOrCtrl+R', click: () => send('nav', { reload: true }) },
+      {
+        label: 'Open Links in Default Browser',
+        type: 'checkbox',
+        checked: linksGoToBrowser(),
+        click: (item) => { state.openLinksInBrowser = item.checked; save(); },
+      },
       { role: 'togglefullscreen' },
       { type: 'separator' },
       { role: 'toggleDevTools' },

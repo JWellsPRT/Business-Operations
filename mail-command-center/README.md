@@ -7,6 +7,7 @@ Each account runs in its own isolated, persistent browser session, so every acco
 ## Features
 
 - **Unread counts** for each account, a total in the sidebar and window title, and a taskbar badge. Counts stay current while you're reading an email.
+- **Links open in your default browser**, as a new tab in your open browser window if it's running. Gmail's redirect wrapper is removed, so the browser goes straight to the real page. Turn this off under **View → Open Links in Default Browser** to open links in a Mail Command Center window instead. Compose and message pop-outs and Google sign-in always stay in the app.
 - **Saved passwords (optional).** They're encrypted with your Windows login (DPAPI) and only ever typed into Google's sign-in page at accounts.google.com. You still click Next yourself.
 - **Encrypted cookies.** Sign-in sessions are encrypted on disk, the same way Chrome does it.
 - **Hardened build.** The app refuses to run if its files have been modified, and the debugging back doors are off.
