@@ -27,6 +27,7 @@
       "preload.js",
       "credentials.js",
       "updater.js",
+      "calendars.js",
       "ui/**/*",
       "build/icon.png",
       "package.json"
@@ -79,7 +80,8 @@
     }
   },
   "dependencies": {
-    "electron-updater": "6.3.9"
+    "electron-updater": "6.3.9",
+    "ical.js": "2.2.1"
   },
   "license": "UNLICENSED",
   "private": true

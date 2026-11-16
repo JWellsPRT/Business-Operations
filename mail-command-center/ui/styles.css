@@ -156,3 +156,69 @@ label.check { flex-direction: row !important; align-items: center; gap: 8px !imp
 #update-banner[hidden] { display: none; }
 #update-banner span { color: var(--muted); }
 #update-banner button { padding: 7px 10px; border-radius: 7px; border: 0; }
+
+/* ---------- Calendar nav item ---------- */
+#nav-calendar { margin-bottom: 2px; }
+.cal-icon {
+  width: 14px; height: 14px; flex: none; margin: 0 1px 0 0;
+  border: 2px solid var(--muted); border-top-width: 4px; border-radius: 3px;
+}
+#nav-calendar.active .cal-icon, #nav-calendar:hover .cal-icon { border-color: var(--text); }
+
+/* ---------- Mail | Calendar switch in the account header ---------- */
+.seg { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; margin-right: 4px; }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 3px 10px; font-size: 12px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button:hover { color: var(--text); }
+.seg button.on { background: var(--panel-2); color: var(--text); box-shadow: inset 0 -2px 0 var(--tile-color, var(--accent)); }
+.icon-btn[hidden] { display: none; }
+
+/* ---------- Combined calendar page ---------- */
+#tiles[hidden], #agenda[hidden] { display: none; }
+#agenda {
+  height: 100%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 18px 22px 30px;
+}
+.agenda-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.agenda-head h1 { margin: 0; font-size: 20px; }
+.agenda-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.agenda-error {
+  display: flex; align-items: center; gap: 6px; padding: 7px 10px; margin: 6px 0;
+  border: 1px solid #5c2b2d; background: #2a1718; border-radius: 8px; font-size: 12px;
+}
+.agenda-error .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.agenda-day { margin-top: 16px; }
+.agenda-day h3 {
+  margin: 0 0 6px; font-size: 13px; font-weight: 650; display: flex; align-items: baseline; gap: 8px;
+  padding-bottom: 5px; border-bottom: 1px solid var(--line);
+}
+.agenda-day h3 span { color: var(--muted); font-weight: 400; }
+.agenda-day.today h3 { color: var(--accent); }
+.agenda-day .muted { margin: 4px 0 0 2px; font-size: 12px; }
+.muted { color: var(--muted); }
+.agenda-event {
+  width: 100%; display: flex; align-items: flex-start; gap: 10px; text-align: left;
+  padding: 7px 8px; border: 0; border-radius: 8px; background: transparent;
+}
+.agenda-event:hover { background: var(--panel-2); }
+.agenda-event.past { opacity: .45; }
+.agenda-event .when { width: 150px; flex: none; color: var(--muted); font-size: 12px; padding-top: 1px; font-variant-numeric: tabular-nums; }
+.agenda-event .bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--c); flex: none; }
+.agenda-event .what { display: flex; flex-direction: column; min-width: 0; }
+.agenda-event .title { font-weight: 550; overflow: hidden; text-overflow: ellipsis; }
+.agenda-event .meta { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-setup { max-width: 520px; margin: 40px auto; text-align: center; }
+.agenda-setup h2 { font-size: 17px; margin: 0 0 8px; }
+.agenda-setup p { color: var(--text); line-height: 1.5; }
+
+/* ---------- Account dialog: calendar addresses ---------- */
+#modal textarea {
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
+  color: var(--text); font: 12px/1.4 ui-monospace, Consolas, monospace; resize: vertical; min-height: 44px;
+}
+#modal textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+#modal { max-height: calc(100vh - 40px); overflow-y: auto; }
+details.help { font-size: 12px; color: var(--muted); margin-top: -4px; }
+details.help summary { cursor: pointer; color: var(--accent); }
+details.help ol { margin: 6px 0 4px; padding-left: 18px; line-height: 1.5; }
+details.help p { margin: 4px 0 0; }

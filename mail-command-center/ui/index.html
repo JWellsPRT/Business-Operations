@@ -16,6 +16,14 @@
       </div>
     </div>
 
+    <button id="nav-calendar" class="nav-item">
+      <span class="cal-icon" aria-hidden="true"></span>
+      <span class="meta">
+        <div class="name">Calendar</div>
+        <div class="email" id="cal-sub">All accounts</div>
+      </span>
+    </button>
+
     <div class="section-label">Accounts</div>
     <ul id="account-list"></ul>
 
@@ -29,6 +37,17 @@
 
   <main id="main">
     <div id="tiles"></div>
+    <section id="agenda" hidden>
+      <header class="agenda-head">
+        <div>
+          <h1>Calendar</h1>
+          <div class="agenda-sub" id="agenda-status"></div>
+        </div>
+        <button id="btn-cal-refresh" class="icon-btn" title="Refresh now">↻</button>
+      </header>
+      <div id="agenda-errors"></div>
+      <div id="agenda-body"></div>
+    </section>
     <div id="empty" hidden>
       <div class="empty-card">
         <h1>Add your first inbox</h1>
@@ -52,6 +71,21 @@
       </label>
       <label class="check" id="f-forget-row" hidden><input type="checkbox" id="f-forget" /> Forget the saved password</label>
       <div class="secure-note" id="f-secure-note"></div>
+      <label>Calendar addresses <span class="opt">optional · for the combined Calendar page</span>
+        <textarea id="f-cal" rows="2" spellcheck="false" placeholder="Paste the &quot;Secret address in iCal format&quot;, one per line"></textarea>
+      </label>
+      <div class="secure-note" id="f-cal-note"></div>
+      <label class="check" id="f-cal-clear-row" hidden><input type="checkbox" id="f-cal-clear" /> Disconnect this account's calendars</label>
+      <details class="help">
+        <summary>Where do I find this?</summary>
+        <ol>
+          <li>Open this account's Google Calendar (the <b>Calendar</b> switch in the account's header).</li>
+          <li>Click the ⚙ gear, then <b>Settings</b>.</li>
+          <li>On the left, under <b>Settings for my calendars</b>, click the calendar.</li>
+          <li>Scroll to <b>Integrate calendar</b> and copy <b>Secret address in iCal format</b>.</li>
+        </ol>
+        <p>Repeat for any other calendars of this account, one address per line. If a work account doesn't show a secret address, its administrator has turned that off.</p>
+      </details>
       <label>Color</label>
       <div id="f-colors"></div>
       <div class="modal-actions">

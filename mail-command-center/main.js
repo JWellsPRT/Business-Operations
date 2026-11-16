@@ -7,8 +7,10 @@ const path = require('path');
 const fs = require('fs');
 const creds = require('./credentials');
 const updater = require('./updater');
+const calendars = require('./calendars');
 
 const GMAIL_URL = 'https://mail.google.com/mail/u/0/#inbox';
+const CALENDAR_URL = 'https://calendar.google.com/calendar/u/0/r';
 
 // Google refuses sign-in from browsers that announce themselves as Electron.
 // Present a plain Chrome user agent instead.
@@ -76,13 +78,14 @@ function unwrapGoogleRedirect(u) {
   return u;
 }
 
-// Gmail's own pop-outs (compose, print, a message in its own window) and Google
-// sign-in need this account's session, so they always open inside the app.
+// Gmail's own pop-outs (compose, print, a message in its own window), Google
+// Calendar and Google sign-in need this account's session, so they always open
+// inside the app.
 function staysInApp(u) {
   if (u === '' || u === 'about:blank') return true;
   try {
     const h = new URL(u).hostname;
-    return h === 'mail.google.com' || h === 'accounts.google.com';
+    return h === 'mail.google.com' || h === 'calendar.google.com' || h === 'accounts.google.com';
   } catch { return false; }
 }
 
@@ -172,9 +175,31 @@ function createView(account) {
   wc.loadURL(GMAIL_URL);
   view.setVisible(false);
   win.contentView.addChildView(view);
-  views.set(account.id, { view });
+  views.set(account.id, { view, cal: null, mode: 'mail' });
   return view;
 }
+
+// The account's Google Calendar, in the same signed-in session as its Gmail.
+// Created the first time the account is switched to Calendar.
+function createCalendarView(account) {
+  const view = new WebContentsView({
+    webPreferences: { partition: partitionFor(account.id), contextIsolation: true, sandbox: true },
+  });
+  view.setBackgroundColor('#ffffff');
+  handleLinks(view.webContents, account);
+  creds.attachAutofill(view.webContents, account.id);
+  view.webContents.loadURL(CALENDAR_URL);
+  view.setVisible(false);
+  win.contentView.addChildView(view);
+  return view;
+}
+
+const activeView = (entry) => (entry.mode === 'calendar' && entry.cal ? entry.cal : entry.view);
+const closeView = (v) => {
+  if (!v) return;
+  try { win?.contentView.removeChildView(v); } catch { /* window gone */ }
+  try { if (!v.webContents.isDestroyed()) v.webContents.close(); } catch { /* already gone */ }
+};
 
 const unreadById = new Map();
 function updateBadge(id, n) {
@@ -186,17 +211,19 @@ function updateBadge(id, n) {
 
 function applyLayout() {
   const { rects } = lastLayout;
-  for (const [id, { view }] of views) {
+  for (const [id, entry] of views) {
     const r = rects[id];
+    const shown = activeView(entry);
+    for (const v of [entry.view, entry.cal]) if (v && v !== shown) v.setVisible(false);
     if (!r || modalOpen || r.width < 2 || r.height < 2) {
-      view.setVisible(false);
+      shown.setVisible(false);
       continue;
     }
-    view.setBounds({
+    shown.setBounds({
       x: Math.round(r.x), y: Math.round(r.y),
       width: Math.round(r.width), height: Math.round(r.height),
     });
-    view.setVisible(true);
+    shown.setVisible(true);
   }
 }
 
@@ -219,8 +246,10 @@ function createWindow() {
   win.on('closed', () => {
     // On macOS the app keeps running after its window closes, and a new window
     // gets fresh views, so shut these accounts' pages down rather than leak them.
-    for (const { view } of views.values()) {
-      try { if (!view.webContents.isDestroyed()) view.webContents.close(); } catch { /* already gone */ }
+    for (const { view, cal } of views.values()) {
+      for (const v of [view, cal]) {
+        try { if (v && !v.webContents.isDestroyed()) v.webContents.close(); } catch { /* already gone */ }
+      }
     }
     views.clear();
     win = null;
@@ -258,23 +287,31 @@ function buildMenu() {
 // password is stored. Passwords themselves never leave the main process.
 function uiState() {
   const saved = Object.fromEntries(state.accounts.map((a) => [a.id, creds.summary(a.id)]));
-  return { ...state, live: liveInfo, creds: saved, secureStorage: creds.available() };
+  const calendarFeeds = Object.fromEntries(state.accounts.map((a) => [a.id, calendars.count(a.id)]));
+  return { ...state, live: liveInfo, creds: saved, calendarFeeds, secureStorage: creds.available() };
 }
 
 ipcMain.handle('state:get', () => uiState());
 
-ipcMain.handle('accounts:add', (_e, { label, color, email, password }) => {
+// Calendar addresses are optional; undefined means "leave as is".
+function saveFeeds(id, calendarFeeds) {
+  if (calendarFeeds === undefined) return null;
+  try { calendars.setFeeds(id, calendarFeeds); refreshCalendars?.(); return null; } catch (err) { return err.message; }
+}
+
+ipcMain.handle('accounts:add', (_e, { label, color, email, password, calendarFeeds }) => {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const account = { id, label: label || `Account ${state.accounts.length + 1}`, color: color || '#4f8cff' };
   let warning = null;
   try { creds.set(id, { email, password }); } catch (err) { warning = err.message; }
   state.accounts.push(account);
   save();
+  warning = saveFeeds(id, calendarFeeds) || warning;
   createView(account);
   return { ...uiState(), warning };
 });
 
-ipcMain.handle('accounts:update', (_e, { id, label, color, email, password, forgetPassword }) => {
+ipcMain.handle('accounts:update', (_e, { id, label, color, email, password, forgetPassword, calendarFeeds }) => {
   const a = state.accounts.find((x) => x.id === id);
   let warning = null;
   if (a) {
@@ -282,6 +319,7 @@ ipcMain.handle('accounts:update', (_e, { id, label, color, email, password, forg
     if (color) a.color = color;
     save();
     try { creds.set(id, { email, password, forgetPassword }); } catch (err) { warning = err.message; }
+    warning = saveFeeds(id, calendarFeeds) || warning;
   }
   return { ...uiState(), warning };
 });
@@ -291,14 +329,16 @@ ipcMain.handle('accounts:remove', async (_e, { id, clearData }) => {
   save();
   const entry = views.get(id);
   if (entry) {
-    win.contentView.removeChildView(entry.view);
-    entry.view.webContents.close();
+    closeView(entry.view);
+    closeView(entry.cal);
     views.delete(id);
   }
   updateBadge(id, 0);
   unreadById.delete(id);
   delete liveInfo[id];
   creds.remove(id);
+  calendars.remove(id);
+  refreshCalendars?.();
   if (clearData) await session.fromPartition(partitionFor(id)).clearStorageData();
   return uiState();
 });
@@ -313,16 +353,33 @@ ipcMain.handle('accounts:reorder', (_e, ids) => {
 ipcMain.on('layout', (_e, layout) => { lastLayout = layout; applyLayout(); });
 ipcMain.on('modal', (_e, open) => { modalOpen = open; applyLayout(); });
 
+// Switch an account between its Gmail and its Google Calendar.
+ipcMain.on('view:mode', (_e, { id, mode }) => {
+  const entry = views.get(id);
+  const account = state.accounts.find((a) => a.id === id);
+  if (!entry || !account) return;
+  entry.mode = mode === 'calendar' ? 'calendar' : 'mail';
+  if (entry.mode === 'calendar' && !entry.cal) entry.cal = createCalendarView(account);
+  applyLayout();
+  activeView(entry).webContents.focus();
+});
+
 ipcMain.on('view:action', (_e, { id, action }) => {
   const entry = views.get(id);
   if (!entry) return;
-  const wc = entry.view.webContents;
+  const inCalendar = entry.mode === 'calendar' && entry.cal;
+  const wc = activeView(entry).webContents;
   if (action === 'reload') wc.reload();
-  if (action === 'home') wc.loadURL(GMAIL_URL);
+  if (action === 'home') wc.loadURL(inCalendar ? CALENDAR_URL : GMAIL_URL);
   if (action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
   if (action === 'focus') wc.focus();
-  if (action === 'compose') wc.loadURL('https://mail.google.com/mail/u/0/#inbox?compose=new');
+  if (action === 'compose' && !inCalendar) wc.loadURL('https://mail.google.com/mail/u/0/#inbox?compose=new');
 });
+
+// ---------- Combined calendar ----------
+let refreshCalendars = null;
+ipcMain.handle('calendars:get', () => calendars.current());
+ipcMain.on('calendars:refresh', () => refreshCalendars?.());
 
 if (process.platform === 'win32') app.setAppUserModelId('com.mailcommandcenter.app');
 
@@ -331,6 +388,7 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   updater.start(send);
+  refreshCalendars = calendars.start(() => state.accounts, (data) => send('calendars:update', data));
   app.on('activate', () => { if (!win) createWindow(); });
 });
 

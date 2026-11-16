@@ -6,7 +6,12 @@ const COLORS = ['#4f8cff', '#30a46c', '#e5484d', '#f5a524', '#8e4ec6', '#12a594'
 const $ = (s) => document.querySelector(s);
 let state = { accounts: [] };
 const live = {}; // id -> { unread, email, error }
-let selectedId = null; // the one account shown
+let selectedId = null; // the one account shown, or CAL_PAGE
+const CAL_PAGE = '__calendar__';
+const modes = {}; // account id -> 'mail' | 'calendar'
+let calData = { events: [], errors: [], updatedAt: null, loading: false, days: 14 };
+const IS_MAC = /Mac/i.test(navigator.platform || navigator.userAgent);
+const ENCRYPTED_WITH = IS_MAC ? "your Mac's Keychain" : 'your Windows login';
 
 // Remember the open account between launches (per-PC convenience only).
 const SELECTED_KEY = 'mcc.selected';
@@ -23,7 +28,7 @@ function syncLayout() {
     document.querySelectorAll('.tile').forEach((tile) => {
       if (tile.offsetParent === null) return; // hidden
       const id = tile.dataset.id;
-      if (live[id]?.error) return;
+      if (live[id]?.error && (modes[id] || 'mail') === 'mail') return;
       const r = tile.querySelector('.slot').getBoundingClientRect();
       rects[id] = { x: r.x, y: r.y, width: r.width, height: r.height };
     });
@@ -36,9 +41,14 @@ window.addEventListener('resize', syncLayout);
 // ---------- Rendering ----------
 function render() {
   const { accounts } = state;
-  // Always show one account: keep the current one if it still exists.
-  if (!accounts.some((a) => a.id === selectedId)) selectedId = accounts[0]?.id ?? null;
+  // Always show something: the calendar page, or an account that still exists.
+  if (selectedId !== CAL_PAGE && !accounts.some((a) => a.id === selectedId)) selectedId = accounts[0]?.id ?? null;
   $('#empty').hidden = accounts.length > 0;
+  $('#nav-calendar').classList.toggle('active', selectedId === CAL_PAGE);
+  $('#agenda').hidden = selectedId !== CAL_PAGE;
+  $('#tiles').hidden = selectedId === CAL_PAGE;
+  renderCalendarNav();
+  if (selectedId === CAL_PAGE) renderAgenda();
 
   // Sidebar
   const list = $('#account-list');
@@ -94,6 +104,10 @@ function makeTile(a) {
       <span class="name"></span>
       <span class="email"></span>
       <span class="badge"></span>
+      <span class="seg" role="group" aria-label="Show">
+        <button data-act="mode-mail">Mail</button>
+        <button data-act="mode-calendar">Calendar</button>
+      </span>
       <span class="actions">
         <button class="icon-btn" data-act="compose" title="Compose">✎</button>
         <button class="icon-btn" data-act="back" title="Back">←</button>
@@ -108,7 +122,8 @@ function makeTile(a) {
     const id = t.dataset.id;
     if (!btn) return;
     const act = btn.dataset.act;
-    if (act === 'edit') openModal(state.accounts.find((x) => x.id === id));
+    if (act === 'mode-mail' || act === 'mode-calendar') setMode(id, act === 'mode-calendar' ? 'calendar' : 'mail');
+    else if (act === 'edit') openModal(state.accounts.find((x) => x.id === id));
     else if (act === 'compose') window.mcc.action(id, 'compose');
     else {
       if (act === 'reload' && live[id]) delete live[id].error;
@@ -128,9 +143,132 @@ function updateTile(t, a) {
   const b = t.querySelector('.badge');
   b.textContent = info.unread ? info.unread.toLocaleString() : '';
   b.hidden = !info.unread;
+  const mode = modes[a.id] || 'mail';
+  t.querySelector('[data-act="mode-mail"]').classList.toggle('on', mode === 'mail');
+  t.querySelector('[data-act="mode-calendar"]').classList.toggle('on', mode === 'calendar');
+  t.querySelector('[data-act="compose"]').hidden = mode !== 'mail';
+  t.querySelector('[data-act="home"]').title = mode === 'mail' ? 'Inbox' : 'Calendar home';
   const slot = t.querySelector('.slot');
-  slot.innerHTML = info.error ? `<div class="error">Couldn't load: ${escapeHtml(info.error)}<br>Use ↻ to retry.</div>` : '';
+  slot.innerHTML = info.error && mode === 'mail' ? `<div class="error">Couldn't load: ${escapeHtml(info.error)}<br>Use ↻ to retry.</div>` : '';
 }
+
+function setMode(id, mode) {
+  modes[id] = mode;
+  window.mcc.setMode(id, mode);
+  render();
+}
+
+// ---------- Combined calendar ----------
+const pad = (n) => String(n).padStart(2, '0');
+const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fromKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const timeText = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const feedsTotal = () => Object.values(state.calendarFeeds || {}).reduce((a, b) => a + b, 0);
+
+function agoText(iso) {
+  if (!iso) return '';
+  const min = Math.round((Date.now() - new Date(iso)) / 60000);
+  return min < 1 ? 'just now' : min < 60 ? `${min} min ago` : `${Math.round(min / 60)} h ago`;
+}
+
+// Place each event on the days it covers within the window. Timed events show
+// on their start day (or today, if they started earlier and are still going).
+function eventsByDay() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const last = new Date(today); last.setDate(last.getDate() + (calData.days || 14));
+  const days = new Map();
+  const put = (k, e) => { if (!days.has(k)) days.set(k, []); days.get(k).push(e); };
+  for (const e of calData.events) {
+    if (!state.accounts.some((a) => a.id === e.accountId)) continue;
+    if (e.allDay) {
+      for (let d = fromKey(e.start); d < fromKey(e.end); d.setDate(d.getDate() + 1)) {
+        if (d >= today && d <= last) put(dayKey(d), e);
+      }
+    } else {
+      const s = new Date(e.start);
+      put(dayKey(s < today ? today : s), e);
+    }
+  }
+  return { today, days };
+}
+
+function renderCalendarNav() {
+  const sub = $('#cal-sub');
+  if (!feedsTotal()) { sub.textContent = 'Set up'; return; }
+  const { today, days } = eventsByDay();
+  const now = new Date();
+  const left = (days.get(dayKey(today)) || []).filter((e) => e.allDay || new Date(e.end) > now).length;
+  sub.textContent = calData.updatedAt ? (left ? `${left} more today` : 'Nothing else today') : 'Loading…';
+}
+
+function renderAgenda() {
+  const status = $('#agenda-status'), body = $('#agenda-body'), errs = $('#agenda-errors');
+  const accountsById = Object.fromEntries(state.accounts.map((a) => [a.id, a]));
+  errs.innerHTML = '';
+  if (!feedsTotal()) {
+    status.textContent = 'Every account, one agenda';
+    body.innerHTML = `<div class="agenda-setup">
+      <h2>Connect your calendars</h2>
+      <p>For each account, open <b>⋯ → Calendar addresses</b> and paste that calendar's
+      <b>Secret address in iCal format</b> from Google Calendar's settings. The dialog explains where to find it.</p>
+      <p class="muted">The addresses are stored encrypted on this computer and only sent to Google.</p>
+    </div>`;
+    return;
+  }
+  status.textContent = calData.loading ? 'Refreshing…'
+    : calData.updatedAt ? `Next ${calData.days || 14} days · updated ${agoText(calData.updatedAt)}` : 'Loading…';
+  for (const er of calData.errors || []) {
+    const a = accountsById[er.accountId];
+    if (!a) continue;
+    const div = document.createElement('div');
+    div.className = 'agenda-error';
+    div.innerHTML = `<span class="dot"></span><b></b> <span></span>`;
+    div.querySelector('.dot').style.background = a.color;
+    div.querySelector('b').textContent = `${a.label}${(state.calendarFeeds?.[a.id] || 0) > 1 ? ` (calendar ${er.feed})` : ''}:`;
+    div.querySelector('span:last-child').textContent = er.message;
+    errs.appendChild(div);
+  }
+
+  const { today, days } = eventsByDay();
+  const now = new Date();
+  body.innerHTML = '';
+  const keys = [...days.keys()].sort();
+  if (!keys.includes(dayKey(today))) keys.unshift(dayKey(today));
+  for (const k of keys) {
+    const d = fromKey(k);
+    const diff = Math.round((d - today) / 86400000);
+    const sec = document.createElement('section');
+    sec.className = 'agenda-day' + (diff === 0 ? ' today' : '');
+    const h = document.createElement('h3');
+    h.textContent = diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : d.toLocaleDateString([], { weekday: 'long' });
+    const small = document.createElement('span');
+    small.textContent = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    h.appendChild(small);
+    sec.appendChild(h);
+    const list = (days.get(k) || []).slice().sort((x, y) => (y.allDay - x.allDay) || (x.start < y.start ? -1 : 1));
+    if (!list.length) {
+      const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Nothing scheduled';
+      sec.appendChild(p);
+    }
+    for (const e of list) {
+      const a = accountsById[e.accountId];
+      const row = document.createElement('button');
+      row.className = 'agenda-event';
+      if (!e.allDay && new Date(e.end) < now) row.classList.add('past');
+      row.style.setProperty('--c', a.color);
+      row.innerHTML = '<span class="when"></span><span class="bar"></span><span class="what"><span class="title"></span><span class="meta"></span></span>';
+      row.querySelector('.when').textContent = e.allDay ? 'All day'
+        : `${timeText(new Date(e.start))} – ${timeText(new Date(e.end))}`;
+      row.querySelector('.title').textContent = e.title;
+      row.querySelector('.meta').textContent = [a.label, e.location].filter(Boolean).join(' · ');
+      row.title = `Open ${a.label}'s calendar`;
+      row.onclick = () => { select(a.id); setMode(a.id, 'calendar'); };
+      sec.appendChild(row);
+    }
+    body.appendChild(sec);
+  }
+}
+
 
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -139,6 +277,11 @@ function select(id) {
   selectedId = id;
   try { localStorage.setItem(SELECTED_KEY, id); } catch { /* storage unavailable */ }
   render();
+  if (id === CAL_PAGE) {
+    // Fetch fresh events if the last refresh is more than 5 minutes old.
+    if (feedsTotal() && (!calData.updatedAt || Date.now() - new Date(calData.updatedAt) > 5 * 60000)) window.mcc.refreshCalendars();
+    return;
+  }
   window.mcc.action(id, 'focus');
 }
 
@@ -175,9 +318,21 @@ function openModal(account) {
   const note = $('#f-secure-note');
   note.classList.toggle('warn', !state.secureStorage);
   note.textContent = state.secureStorage
-    ? 'Your password is encrypted with your Windows login and only typed into accounts.google.com.'
+    ? `Your password is encrypted with ${ENCRYPTED_WITH} and only typed into accounts.google.com.`
     : 'Secure storage isn\'t available on this computer, so passwords can\'t be saved.';
   $('#f-password').disabled = !state.secureStorage;
+  const feeds = (editing && state.calendarFeeds?.[editing.id]) || 0;
+  $('#f-cal').value = '';
+  $('#f-cal').disabled = !state.secureStorage;
+  $('#f-cal').placeholder = feeds
+    ? `${feeds} calendar${feeds === 1 ? '' : 's'} connected. Paste new addresses to replace ${feeds === 1 ? 'it' : 'them'}.`
+    : 'Paste the "Secret address in iCal format", one per line';
+  $('#f-cal-clear').checked = false;
+  $('#f-cal-clear-row').hidden = !feeds;
+  $('#f-cal-note').textContent = state.secureStorage
+    ? `Stored encrypted with ${ENCRYPTED_WITH}. Anyone with this address can read the calendar, so don't share it.`
+    : "Secure storage isn't available on this computer, so calendar addresses can't be saved.";
+  $('#f-cal-note').classList.toggle('warn', !state.secureStorage);
   $('#f-delete').hidden = !editing;
   $('#f-delete-confirm').hidden = true;
   pickedColor = editing ? editing.color : COLORS[state.accounts.length % COLORS.length];
@@ -197,6 +352,7 @@ function openModal(account) {
 }
 function closeModal() {
   $('#f-password').value = '';
+  $('#f-cal').value = '';
   $('#modal-backdrop').hidden = true;
   window.mcc.modal(false);
 }
@@ -206,13 +362,17 @@ $('#modal').addEventListener('submit', async (e) => {
   const email = $('#f-email').value.trim();
   const password = $('#f-password').value;
   $('#f-password').value = '';
+  // Calendar addresses: undefined keeps what's saved; '' disconnects.
+  const calText = $('#f-cal').value.trim();
+  const calendarFeeds = $('#f-cal-clear').checked ? '' : calText || undefined;
+  $('#f-cal').value = '';
   if (editing) {
-    state = await window.mcc.updateAccount({ id: editing.id, label, color: pickedColor, email, password, forgetPassword: $('#f-forget').checked });
+    state = await window.mcc.updateAccount({ id: editing.id, label, color: pickedColor, email, password, forgetPassword: $('#f-forget').checked, calendarFeeds });
     if (state.warning) alert(state.warning);
     closeModal();
     render();
   } else {
-    state = await window.mcc.addAccount({ label, color: pickedColor, email, password });
+    state = await window.mcc.addAccount({ label, color: pickedColor, email, password, calendarFeeds });
     if (state.warning) alert(state.warning);
     closeModal();
     select(state.accounts[state.accounts.length - 1].id); // go straight to sign-in
@@ -234,6 +394,10 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#mod
 // ---------- Controls ----------
 $('#btn-add').onclick = () => openModal();
 $('#btn-add-empty').onclick = () => openModal();
+$('#nav-calendar').onclick = () => select(CAL_PAGE);
+$('#btn-cal-refresh').onclick = () => window.mcc.refreshCalendars();
+window.mcc.on('calendars:update', (data) => { calData = data; render(); });
+setInterval(() => { if (selectedId === CAL_PAGE) render(); else renderCalendarNav(); }, 60000); // keep "updated … ago" and today's count current
 
 // ---------- Events from main ----------
 window.mcc.on('account:update', (p) => {
@@ -244,6 +408,7 @@ window.mcc.on('account:update', (p) => {
 window.mcc.on('nav', (n) => {
   if (!$('#modal-backdrop').hidden) return;
   if (n.add) return openModal();
+  if (n.reload && selectedId === CAL_PAGE) return window.mcc.refreshCalendars();
   if (n.reload && selectedId) window.mcc.action(selectedId, 'reload');
 });
 
@@ -269,5 +434,6 @@ window.mcc.on('update:available', ({ version }) => {
 (async () => {
   state = await window.mcc.getState();
   Object.assign(live, state.live || {});
+  calData = await window.mcc.getCalendars();
   render();
 })();
