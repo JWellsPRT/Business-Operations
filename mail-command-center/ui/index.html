@@ -21,15 +21,7 @@
       <button data-view="calendar"><span class="cal-icon" aria-hidden="true"></span>Calendar</button>
     </div>
 
-    <button id="nav-calendar" class="nav-item" hidden>
-      <span class="cal-icon all" aria-hidden="true"></span>
-      <span class="meta">
-        <div class="name">All calendars</div>
-        <div class="email" id="cal-sub">Every account</div>
-      </span>
-    </button>
-
-    <div class="section-label">Accounts</div>
+    <div class="section-label" id="list-label">Accounts</div>
     <ul id="account-list"></ul>
 
     <button id="btn-add" class="add-btn">+ Add account</button>
@@ -50,7 +42,6 @@
         </div>
         <button id="btn-cal-refresh" class="icon-btn" title="Refresh now">↻</button>
       </header>
-      <div id="other-cals" class="other-cals"></div>
       <div id="agenda-errors"></div>
       <div id="agenda-body"></div>
     </section>

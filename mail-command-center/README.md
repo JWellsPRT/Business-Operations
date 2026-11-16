@@ -6,12 +6,12 @@ Each account runs in its own isolated, persistent browser session, so every acco
 
 ## Features
 
-- **Calendars.**
-  - The **Mail | Calendar** switch at the top of the sidebar flips every account between its Gmail and its Google Calendar, using the same sign-in, and keeps you on the account you were looking at. The app remembers which view you were in.
-  - In Calendar view, **All calendars** merges the next 14 days from every account into one agenda, color-coded by account. Click an event to open that account's calendar.
-  - To connect an account to **All calendars**, open its **⋯** menu and paste the calendar's **Secret address in iCal format**. In Google Calendar that's under ⚙ Settings → (your calendar) → Integrate calendar. Add one address per line for several calendars. The addresses are stored encrypted, because anyone with one can read that calendar. Some work accounts have secret addresses turned off by their administrator.
-  - **Other calendars**, like your personal iCloud calendar: in **All calendars**, click **+ Add calendar** and paste the calendar's public link. In iCloud, turn on **Public Calendar** for that calendar and copy its `webcal://` link; the dialog has steps for iPhone, Mac and iCloud.com. Any calendar with an iCal (.ics or webcal://) link works, Outlook.com included. Click a calendar's chip to rename it, change its color or remove it.
-  - **All calendars** refreshes every 15 minutes, or when you click ↻.
+- **Calendars.** The **Mail | Calendar** switch at the top of the sidebar flips between your inboxes and one combined calendar. The app remembers which view you were in.
+  - **Calendar view** shows the next 14 days from every connected calendar in one agenda, color-coded. The sidebar lists each calendar with a checkbox: click a calendar to hide or show its events. Hidden calendars are remembered.
+  - Click an event to open that day in the account's Google Calendar, in its own window, already signed in.
+  - **Connect a Gmail account's calendar:** click the account in Calendar view (unconnected ones say "Not connected"), or use **⋯**, and paste the calendar's **Secret address in iCal format**. In Google Calendar that's under ⚙ Settings → (your calendar) → Integrate calendar. Add one address per line for several calendars. The addresses are stored encrypted, because anyone with one can read that calendar. Some work accounts have secret addresses turned off by their administrator.
+  - **Other calendars**, like your personal iCloud calendar: in Calendar view, click **+ Add calendar** and paste the calendar's public link. In iCloud, turn on **Public Calendar** for that calendar and copy its `webcal://` link; the dialog has steps for iPhone, Mac and iCloud.com. Any calendar with an iCal (.ics or webcal://) link works, Outlook.com included. Use **⋯** next to it to rename it, change its color or remove it.
+  - The calendar refreshes every 15 minutes, or when you click ↻.
 - **Unread counts** for each account, a total in the sidebar and window title, and a taskbar badge. Counts stay current while you're reading an email.
 - **Links open in your default browser**, as a new tab in your open browser window if it's running. Gmail's redirect wrapper is removed, so the browser goes straight to the real page. Turn this off under **View → Open Links in Default Browser** to open links in a Mail Command Center window instead. Compose and message pop-outs and Google sign-in always stay in the app.
 - **Saved passwords (optional).** They're encrypted with your Windows login (DPAPI) and only ever typed into Google's sign-in page at accounts.google.com. You still click Next yourself.

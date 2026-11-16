@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('mcc', {
   layout: (l) => ipcRenderer.send('layout', l),
   modal: (open) => ipcRenderer.send('modal', open),
   action: (id, action) => ipcRenderer.send('view:action', { id, action }),
-  setMode: (id, mode) => ipcRenderer.send('view:mode', { id, mode }),
+  openCalendarDay: (id, day) => ipcRenderer.send('calendar:open', { id, day }),
   getCalendars: () => ipcRenderer.invoke('calendars:get'),
   refreshCalendars: () => ipcRenderer.send('calendars:refresh'),
   saveOtherCalendar: (c) => ipcRenderer.invoke('othercal:save', c),

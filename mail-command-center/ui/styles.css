@@ -172,10 +172,6 @@ label.check { flex-direction: row !important; align-items: center; gap: 8px !imp
 .mail-icon { background: linear-gradient(to bottom right, transparent 46%, currentColor 47% 53%, transparent 54%) top left / 50% 100% no-repeat,
                          linear-gradient(to bottom left, transparent 46%, currentColor 47% 53%, transparent 54%) top right / 50% 100% no-repeat; }
 .cal-icon { height: 14px; border-top-width: 4px; border-radius: 3px; }
-.cal-icon.all { color: var(--muted); }
-#nav-calendar[hidden] { display: none; }
-#nav-calendar { margin-bottom: 2px; }
-#nav-calendar.active .cal-icon.all, #nav-calendar:hover .cal-icon.all { color: var(--text); }
 .icon-btn[hidden] { display: none; }
 
 /* ---------- Combined calendar page ---------- */
@@ -228,17 +224,21 @@ details.help summary { cursor: pointer; color: var(--accent); }
 details.help ol { margin: 6px 0 4px; padding-left: 18px; line-height: 1.5; }
 details.help p { margin: 4px 0 0; }
 
-/* ---------- Other calendars (iCloud, Outlook…) ---------- */
-.other-cals { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
-.cal-chip {
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
-  border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 12px;
+/* ---------- Calendar view: sidebar show/hide list ---------- */
+.cal-row .check {
+  width: 16px; height: 16px; flex: none; border-radius: 4px;
+  border: 2px solid var(--c); background: transparent; position: relative;
 }
-.cal-chip:hover { background: var(--panel-2); }
-.cal-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
-.cal-chip.account { cursor: default; }
-.cal-chip.account:hover { background: transparent; }
-.cal-chip.add { color: var(--muted); border-style: dashed; }
-.cal-chip.add:hover { color: var(--text); }
+.cal-row.on .check { background: var(--c); }
+.cal-row.on .check::after {
+  content: ''; position: absolute; left: 4px; top: 0px; width: 4px; height: 8px;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.cal-row:not(.on) .name { color: var(--muted); }
+.cal-row.unconnected .check { border-style: dashed; opacity: .7; }
+.cal-row .row-edit { color: var(--muted); padding: 0 4px; border-radius: 5px; visibility: hidden; }
+.cal-row:hover .row-edit { visibility: visible; }
+.cal-row .row-edit:hover { background: var(--line); color: var(--text); }
+.list-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 12px 10px 4px; }
 .agenda-event.no-link { cursor: default; }
 .agenda-event.no-link:hover { background: transparent; }

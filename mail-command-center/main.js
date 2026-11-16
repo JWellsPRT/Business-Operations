@@ -175,26 +175,10 @@ function createView(account) {
   wc.loadURL(GMAIL_URL);
   view.setVisible(false);
   win.contentView.addChildView(view);
-  views.set(account.id, { view, cal: null, mode: 'mail' });
+  views.set(account.id, { view });
   return view;
 }
 
-// The account's Google Calendar, in the same signed-in session as its Gmail.
-// Created the first time the account is switched to Calendar.
-function createCalendarView(account) {
-  const view = new WebContentsView({
-    webPreferences: { partition: partitionFor(account.id), contextIsolation: true, sandbox: true },
-  });
-  view.setBackgroundColor('#ffffff');
-  handleLinks(view.webContents, account);
-  creds.attachAutofill(view.webContents, account.id);
-  view.webContents.loadURL(CALENDAR_URL);
-  view.setVisible(false);
-  win.contentView.addChildView(view);
-  return view;
-}
-
-const activeView = (entry) => (entry.mode === 'calendar' && entry.cal ? entry.cal : entry.view);
 const closeView = (v) => {
   if (!v) return;
   try { win?.contentView.removeChildView(v); } catch { /* window gone */ }
@@ -211,19 +195,17 @@ function updateBadge(id, n) {
 
 function applyLayout() {
   const { rects } = lastLayout;
-  for (const [id, entry] of views) {
+  for (const [id, { view }] of views) {
     const r = rects[id];
-    const shown = activeView(entry);
-    for (const v of [entry.view, entry.cal]) if (v && v !== shown) v.setVisible(false);
     if (!r || modalOpen || r.width < 2 || r.height < 2) {
-      shown.setVisible(false);
+      view.setVisible(false);
       continue;
     }
-    shown.setBounds({
+    view.setBounds({
       x: Math.round(r.x), y: Math.round(r.y),
       width: Math.round(r.width), height: Math.round(r.height),
     });
-    shown.setVisible(true);
+    view.setVisible(true);
   }
 }
 
@@ -246,10 +228,8 @@ function createWindow() {
   win.on('closed', () => {
     // On macOS the app keeps running after its window closes, and a new window
     // gets fresh views, so shut these accounts' pages down rather than leak them.
-    for (const { view, cal } of views.values()) {
-      for (const v of [view, cal]) {
-        try { if (v && !v.webContents.isDestroyed()) v.webContents.close(); } catch { /* already gone */ }
-      }
+    for (const { view } of views.values()) {
+      try { if (!view.webContents.isDestroyed()) view.webContents.close(); } catch { /* already gone */ }
     }
     views.clear();
     win = null;
@@ -331,7 +311,6 @@ ipcMain.handle('accounts:remove', async (_e, { id, clearData }) => {
   const entry = views.get(id);
   if (entry) {
     closeView(entry.view);
-    closeView(entry.cal);
     views.delete(id);
   }
   updateBadge(id, 0);
@@ -354,27 +333,30 @@ ipcMain.handle('accounts:reorder', (_e, ids) => {
 ipcMain.on('layout', (_e, layout) => { lastLayout = layout; applyLayout(); });
 ipcMain.on('modal', (_e, open) => { modalOpen = open; applyLayout(); });
 
-// Switch an account between its Gmail and its Google Calendar.
-ipcMain.on('view:mode', (_e, { id, mode }) => {
-  const entry = views.get(id);
+// Open a day of an account's Google Calendar in its own window, signed in
+// with that account's session (from an event on the combined calendar).
+ipcMain.on('calendar:open', (_e, { id, day }) => {
   const account = state.accounts.find((a) => a.id === id);
-  if (!entry || !account) return;
-  entry.mode = mode === 'calendar' ? 'calendar' : 'mail';
-  if (entry.mode === 'calendar' && !entry.cal) entry.cal = createCalendarView(account);
-  applyLayout();
-  activeView(entry).webContents.focus();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day));
+  if (!account || !m) return;
+  const child = new BrowserWindow({
+    width: 1100, height: 800, autoHideMenuBar: true, title: `${account.label} · Calendar`,
+    webPreferences: { partition: partitionFor(account.id), contextIsolation: true, sandbox: true },
+  });
+  handleLinks(child.webContents, account);
+  creds.attachAutofill(child.webContents, account.id);
+  child.loadURL(`${CALENDAR_URL}/day/${m[1]}/${Number(m[2])}/${Number(m[3])}`);
 });
 
 ipcMain.on('view:action', (_e, { id, action }) => {
   const entry = views.get(id);
   if (!entry) return;
-  const inCalendar = entry.mode === 'calendar' && entry.cal;
-  const wc = activeView(entry).webContents;
+  const wc = entry.view.webContents;
   if (action === 'reload') wc.reload();
-  if (action === 'home') wc.loadURL(inCalendar ? CALENDAR_URL : GMAIL_URL);
+  if (action === 'home') wc.loadURL(GMAIL_URL);
   if (action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
   if (action === 'focus') wc.focus();
-  if (action === 'compose' && !inCalendar) wc.loadURL('https://mail.google.com/mail/u/0/#inbox?compose=new');
+  if (action === 'compose') wc.loadURL('https://mail.google.com/mail/u/0/#inbox?compose=new');
 });
 
 // ---------- Combined calendar ----------
