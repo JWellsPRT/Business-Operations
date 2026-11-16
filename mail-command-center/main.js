@@ -21,7 +21,7 @@ app.userAgentFallback = app.userAgentFallback
 
 const storePath = () => path.join(app.getPath('userData'), 'accounts.json');
 
-let state = { accounts: [] };
+let state = { accounts: [], otherCalendars: [] }; // otherCalendars: calendars not tied to an account (iCloud, Outlook…)
 let win = null;
 const views = new Map(); // id -> { view, visible }
 let modalOpen = false;
@@ -287,7 +287,8 @@ function buildMenu() {
 // password is stored. Passwords themselves never leave the main process.
 function uiState() {
   const saved = Object.fromEntries(state.accounts.map((a) => [a.id, creds.summary(a.id)]));
-  const calendarFeeds = Object.fromEntries(state.accounts.map((a) => [a.id, calendars.count(a.id)]));
+  const calendarFeeds = Object.fromEntries(
+    [...state.accounts, ...(state.otherCalendars || [])].map((a) => [a.id, calendars.count(a.id)]));
   return { ...state, live: liveInfo, creds: saved, calendarFeeds, secureStorage: creds.available() };
 }
 
@@ -381,6 +382,36 @@ let refreshCalendars = null;
 ipcMain.handle('calendars:get', () => calendars.current());
 ipcMain.on('calendars:refresh', () => refreshCalendars?.());
 
+// Other calendars: a name, a color and one iCal address (e.g. an iCloud public
+// calendar link). The address is validated and stored encrypted before the
+// calendar is added, so a bad address never leaves a half-made entry.
+ipcMain.handle('othercal:save', (_e, { id, label, color, feed }) => {
+  state.otherCalendars ||= [];
+  const existing = id && state.otherCalendars.find((c) => c.id === id);
+  const calId = existing ? existing.id : `cal-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  if (!existing && !String(feed || '').trim()) return { ...uiState(), warning: 'Paste the calendar\'s address.' };
+  if (String(feed || '').trim()) {
+    try { calendars.setFeeds(calId, feed); } catch (err) { return { ...uiState(), warning: err.message }; }
+  }
+  if (existing) {
+    existing.label = label || existing.label;
+    existing.color = color || existing.color;
+  } else {
+    state.otherCalendars.push({ id: calId, label: label || 'Calendar', color: color || '#9ba1a6' });
+  }
+  save();
+  refreshCalendars?.();
+  return uiState();
+});
+
+ipcMain.handle('othercal:remove', (_e, id) => {
+  state.otherCalendars = (state.otherCalendars || []).filter((c) => c.id !== id);
+  save();
+  calendars.remove(id);
+  refreshCalendars?.();
+  return uiState();
+});
+
 if (process.platform === 'win32') app.setAppUserModelId('com.mailcommandcenter.app');
 
 app.whenReady().then(() => {
@@ -388,7 +419,9 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   updater.start(send);
-  refreshCalendars = calendars.start(() => state.accounts, (data) => send('calendars:update', data));
+  refreshCalendars = calendars.start(
+    () => [...state.accounts, ...(state.otherCalendars || [])],
+    (data) => send('calendars:update', data));
   app.on('activate', () => { if (!win) createWindow(); });
 });
 

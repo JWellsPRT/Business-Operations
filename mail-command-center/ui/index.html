@@ -45,6 +45,7 @@
         </div>
         <button id="btn-cal-refresh" class="icon-btn" title="Refresh now">↻</button>
       </header>
+      <div id="other-cals" class="other-cals"></div>
       <div id="agenda-errors"></div>
       <div id="agenda-body"></div>
     </section>
@@ -57,8 +58,8 @@
     </div>
   </main>
 
-  <div id="modal-backdrop" hidden>
-    <form id="modal" autocomplete="off">
+  <div id="modal-backdrop" class="modal-backdrop" hidden>
+    <form id="modal" class="modal-form" autocomplete="off">
       <h2 id="modal-title">Add account</h2>
       <label>Label
         <input id="f-label" placeholder="e.g. Sales, Personal, Support" required />
@@ -102,6 +103,36 @@
           <button type="button" id="f-delete-no">Keep it</button>
           <button type="button" id="f-delete-yes" class="danger">Remove</button>
         </div>
+      </div>
+    </form>
+  </div>
+
+  <div id="cal-backdrop" class="modal-backdrop" hidden>
+    <form id="cal-modal" class="modal-form" autocomplete="off">
+      <h2 id="cal-title">Add a calendar</h2>
+      <p class="secure-note" style="margin:0">For calendars that aren't one of your Gmail accounts, like your personal iCloud calendar. Any calendar with an iCal (.ics or webcal://) link works.</p>
+      <label>Name
+        <input id="c-label" placeholder="e.g. Personal, Family" required />
+      </label>
+      <label>Calendar address
+        <textarea id="c-feed" rows="2" spellcheck="false" placeholder="webcal://p…-caldav.icloud.com/published/2/…"></textarea>
+      </label>
+      <div class="secure-note" id="c-note"></div>
+      <details class="help">
+        <summary>How do I get the address from iCloud?</summary>
+        <p><b>iPhone or iPad:</b> open Calendar → <b>Calendars</b> → tap ⓘ next to the calendar → turn on <b>Public Calendar</b> → <b>Share Link…</b> → <b>Copy</b>.</p>
+        <p><b>Mac:</b> in Calendar, Control-click the iCloud calendar → <b>Share Calendar…</b> → tick <b>Public Calendar</b> → copy the address.</p>
+        <p><b>iCloud.com:</b> open Calendar, click the share icon next to the calendar → turn on <b>Public Calendar</b> → <b>Copy Link</b>.</p>
+        <p>A public calendar link lets anyone who has it see the calendar's events, so keep it private. Turning Public Calendar off later stops the link from working.</p>
+        <p><b>Outlook.com:</b> Settings → Calendar → Shared calendars → <b>Publish a calendar</b> → copy the <b>ICS</b> link.</p>
+      </details>
+      <label>Color</label>
+      <div id="c-colors"></div>
+      <div class="modal-actions">
+        <button type="button" id="c-delete" class="danger" hidden>Remove</button>
+        <span class="spacer"></span>
+        <button type="button" id="c-cancel">Cancel</button>
+        <button type="submit" class="primary" id="c-save">Add</button>
       </div>
     </form>
   </div>

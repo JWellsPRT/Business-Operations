@@ -110,23 +110,23 @@ li.drop-target .nav-item { box-shadow: inset 0 2px 0 var(--accent); }
 .empty-card p { color: var(--muted); margin: 0 0 18px; }
 
 /* ---------- Modal ---------- */
-#modal-backdrop {
+.modal-backdrop {
   position: fixed; inset: 0; background: rgba(0,0,0,.55);
   display: grid; place-items: center; z-index: 10;
 }
-#modal-backdrop[hidden] { display: none; }
-#modal {
+.modal-backdrop[hidden] { display: none; }
+.modal-form {
   width: 380px; background: var(--panel); border: 1px solid var(--line);
   border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 10px;
   user-select: text;
 }
-#modal h2 { margin: 0 0 4px; font-size: 16px; }
-#modal label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); }
-#modal input:not([type]), #modal input[type=text], #modal input[type=email], #modal input[type=password] {
+.modal-form h2 { margin: 0 0 4px; font-size: 16px; }
+.modal-form label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); }
+.modal-form input:not([type]), .modal-form input[type=text], .modal-form input[type=email], .modal-form input[type=password] {
   padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
   background: var(--bg); color: var(--text); font: inherit;
 }
-#modal input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.modal-form input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .opt { color: var(--muted); font-size: 11px; opacity: .8; }
 .secure-note { font-size: 11px; color: var(--muted); margin-top: -4px; }
 .secure-note.warn { color: #f5a524; }
@@ -145,7 +145,7 @@ li.drop-target .nav-item { box-shadow: inset 0 2px 0 var(--accent); }
 #f-delete-confirm { border-top: 1px solid var(--line); padding-top: 12px; }
 #f-delete-confirm p { margin: 0 0 8px; }
 label.check { flex-direction: row !important; align-items: center; gap: 8px !important; }
-#modal [hidden] { display: none !important; }
+.modal-form [hidden] { display: none !important; }
 
 /* ---------- Update banner ---------- */
 #update-banner {
@@ -212,13 +212,28 @@ label.check { flex-direction: row !important; align-items: center; gap: 8px !imp
 .agenda-setup p { color: var(--text); line-height: 1.5; }
 
 /* ---------- Account dialog: calendar addresses ---------- */
-#modal textarea {
+.modal-form textarea {
   padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
   color: var(--text); font: 12px/1.4 ui-monospace, Consolas, monospace; resize: vertical; min-height: 44px;
 }
-#modal textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-#modal { max-height: calc(100vh - 40px); overflow-y: auto; }
+.modal-form textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.modal-form { max-height: calc(100vh - 40px); overflow-y: auto; }
 details.help { font-size: 12px; color: var(--muted); margin-top: -4px; }
 details.help summary { cursor: pointer; color: var(--accent); }
 details.help ol { margin: 6px 0 4px; padding-left: 18px; line-height: 1.5; }
 details.help p { margin: 4px 0 0; }
+
+/* ---------- Other calendars (iCloud, Outlook…) ---------- */
+.other-cals { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.cal-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 12px;
+}
+.cal-chip:hover { background: var(--panel-2); }
+.cal-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+.cal-chip.account { cursor: default; }
+.cal-chip.account:hover { background: transparent; }
+.cal-chip.add { color: var(--muted); border-style: dashed; }
+.cal-chip.add:hover { color: var(--text); }
+.agenda-event.no-link { cursor: default; }
+.agenda-event.no-link:hover { background: transparent; }

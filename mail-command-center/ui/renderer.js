@@ -164,6 +164,11 @@ const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDa
 const fromKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
 const timeText = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const feedsTotal = () => Object.values(state.calendarFeeds || {}).reduce((a, b) => a + b, 0);
+// Everything that can own events on the Calendar page: accounts and other calendars.
+const calendarOwners = () => [
+  ...state.accounts.map((a) => ({ ...a, kind: 'account' })),
+  ...(state.otherCalendars || []).map((c) => ({ ...c, kind: 'other' })),
+];
 
 function agoText(iso) {
   if (!iso) return '';
@@ -179,7 +184,7 @@ function eventsByDay() {
   const days = new Map();
   const put = (k, e) => { if (!days.has(k)) days.set(k, []); days.get(k).push(e); };
   for (const e of calData.events) {
-    if (!state.accounts.some((a) => a.id === e.accountId)) continue;
+    if (!calendarOwners().some((a) => a.id === e.accountId)) continue;
     if (e.allDay) {
       for (let d = fromKey(e.start); d < fromKey(e.end); d.setDate(d.getDate() + 1)) {
         if (d >= today && d <= last) put(dayKey(d), e);
@@ -192,6 +197,84 @@ function eventsByDay() {
   return { today, days };
 }
 
+// Chips above the agenda: connected accounts (for reference) and other
+// calendars (click to edit), plus "+ Add calendar".
+function renderCalendarChips() {
+  const box = $('#other-cals');
+  box.innerHTML = '';
+  for (const c of calendarOwners()) {
+    if (c.kind === 'account' && !(state.calendarFeeds?.[c.id])) continue;
+    const chip = document.createElement('button');
+    chip.className = 'cal-chip' + (c.kind === 'account' ? ' account' : '');
+    chip.innerHTML = '<span class="dot"></span><span></span>';
+    chip.querySelector('.dot').style.background = c.color;
+    chip.querySelector('span:last-child').textContent = c.label;
+    if (c.kind === 'other') { chip.title = 'Edit this calendar'; chip.onclick = () => openCalModal(c); }
+    else chip.title = 'Connected through this account (edit with ⋯ on the account)';
+    box.appendChild(chip);
+  }
+  const add = document.createElement('button');
+  add.className = 'cal-chip add';
+  add.textContent = '+ Add calendar';
+  add.onclick = () => openCalModal();
+  box.appendChild(add);
+}
+
+// ---------- Other-calendar dialog ----------
+let editingCal = null;
+let calColor = COLORS[0];
+function openCalModal(c) {
+  editingCal = c || null;
+  $('#cal-title').textContent = editingCal ? 'Edit calendar' : 'Add a calendar';
+  $('#c-save').textContent = editingCal ? 'Save' : 'Add';
+  $('#c-label').value = editingCal ? editingCal.label : '';
+  $('#c-feed').value = '';
+  $('#c-feed').disabled = !state.secureStorage;
+  $('#c-feed').placeholder = editingCal ? 'Connected. Paste a new address to replace it.' : 'webcal://p…-caldav.icloud.com/published/2/…';
+  $('#c-note').textContent = state.secureStorage
+    ? `Stored encrypted with ${ENCRYPTED_WITH} and only sent to the calendar's own server.`
+    : "Secure storage isn't available on this computer, so calendar addresses can't be saved.";
+  $('#c-note').classList.toggle('warn', !state.secureStorage);
+  $('#c-delete').hidden = !editingCal;
+  calColor = editingCal ? editingCal.color : COLORS[(state.otherCalendars || []).length % COLORS.length];
+  const sw = $('#c-colors');
+  sw.innerHTML = '';
+  COLORS.forEach((col) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'swatch' + (col === calColor ? ' sel' : '');
+    b.style.background = col;
+    b.onclick = () => { calColor = col; sw.querySelectorAll('.swatch').forEach((x) => x.classList.toggle('sel', x === b)); };
+    sw.appendChild(b);
+  });
+  window.mcc.modal(true);
+  $('#cal-backdrop').hidden = false;
+  $('#c-label').focus();
+}
+function closeCalModal() {
+  $('#c-feed').value = '';
+  $('#cal-backdrop').hidden = true;
+  window.mcc.modal(false);
+}
+$('#cal-modal').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const feed = $('#c-feed').value.trim();
+  const next = await window.mcc.saveOtherCalendar({ id: editingCal?.id, label: $('#c-label').value.trim(), color: calColor, feed });
+  if (next.warning) { alert(next.warning); return; } // keep the dialog open to fix the address
+  state = next;
+  closeCalModal();
+  render();
+});
+$('#c-cancel').onclick = closeCalModal;
+$('#c-delete').onclick = async () => {
+  if (!editingCal || !confirm(`Remove "${editingCal.label}" from the Calendar page?`)) return;
+  state = await window.mcc.removeOtherCalendar(editingCal.id);
+  closeCalModal();
+  render();
+};
+$('#cal-backdrop').addEventListener('mousedown', (e) => { if (e.target.id === 'cal-backdrop') closeCalModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#cal-backdrop').hidden) closeCalModal(); });
+
 function renderCalendarNav() {
   const sub = $('#cal-sub');
   if (!feedsTotal()) { sub.textContent = 'Set up'; return; }
@@ -203,15 +286,17 @@ function renderCalendarNav() {
 
 function renderAgenda() {
   const status = $('#agenda-status'), body = $('#agenda-body'), errs = $('#agenda-errors');
-  const accountsById = Object.fromEntries(state.accounts.map((a) => [a.id, a]));
+  const accountsById = Object.fromEntries(calendarOwners().map((a) => [a.id, a]));
   errs.innerHTML = '';
+  renderCalendarChips();
   if (!feedsTotal()) {
     status.textContent = 'Every account, one agenda';
     body.innerHTML = `<div class="agenda-setup">
       <h2>Connect your calendars</h2>
       <p>For each account, open <b>⋯ → Calendar addresses</b> and paste that calendar's
       <b>Secret address in iCal format</b> from Google Calendar's settings. The dialog explains where to find it.</p>
-      <p class="muted">The addresses are stored encrypted on this computer and only sent to Google.</p>
+      <p>For other calendars, like your personal iCloud calendar, use <b>+ Add calendar</b> above.</p>
+      <p class="muted">The addresses are stored encrypted on this computer and only sent to the calendar's own server.</p>
     </div>`;
     return;
   }
@@ -261,8 +346,13 @@ function renderAgenda() {
         : `${timeText(new Date(e.start))} – ${timeText(new Date(e.end))}`;
       row.querySelector('.title').textContent = e.title;
       row.querySelector('.meta').textContent = [a.label, e.location].filter(Boolean).join(' · ');
-      row.title = `Open ${a.label}'s calendar`;
-      row.onclick = () => { select(a.id); setMode(a.id, 'calendar'); };
+      if (a.kind === 'account') {
+        row.title = `Open ${a.label}'s calendar`;
+        row.onclick = () => { select(a.id); setMode(a.id, 'calendar'); };
+      } else {
+        row.classList.add('no-link');
+        row.title = `From ${a.label}`;
+      }
       sec.appendChild(row);
     }
     body.appendChild(sec);

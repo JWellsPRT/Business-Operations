@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('mcc', {
   setMode: (id, mode) => ipcRenderer.send('view:mode', { id, mode }),
   getCalendars: () => ipcRenderer.invoke('calendars:get'),
   refreshCalendars: () => ipcRenderer.send('calendars:refresh'),
+  saveOtherCalendar: (c) => ipcRenderer.invoke('othercal:save', c),
+  removeOtherCalendar: (id) => ipcRenderer.invoke('othercal:remove', id),
   installUpdate: () => ipcRenderer.send('update:install'),
   openUpdatePage: () => ipcRenderer.send('update:open'),
   on: (channel, fn) => {
