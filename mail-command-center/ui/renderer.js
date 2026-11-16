@@ -236,15 +236,16 @@ function renderCalendarList(list) {
     };
     list.appendChild(li);
   };
-  calendarOwners().filter((c) => c.kind === 'account').forEach(row);
+  const accts = calendarOwners().filter((c) => c.kind === 'account');
+  accts.forEach(row);
   const others = calendarOwners().filter((c) => c.kind === 'other');
-  if (others.length) {
+  if (others.length && accts.length) { // a second heading only when there are accounts above
     const lbl = document.createElement('li');
     lbl.className = 'list-label';
     lbl.textContent = 'Other calendars';
     list.appendChild(lbl);
-    others.forEach(row);
   }
+  others.forEach(row);
 }
 
 function todayText() {
@@ -319,9 +320,10 @@ function renderAgenda() {
     status.textContent = 'Every account, one agenda';
     body.innerHTML = `<div class="agenda-setup">
       <h2>Connect your calendars</h2>
-      <p>Click an account in the sidebar and paste that calendar's <b>Secret address in iCal format</b>
-      from Google Calendar's settings. The dialog explains where to find it.</p>
-      <p>For other calendars, like your personal iCloud calendar, use <b>+ Add calendar</b> in the sidebar.</p>
+      <p>Use <b>+ Add calendar</b> in the sidebar for any calendar with an iCal link: your personal iCloud
+      calendar, or a colleague's calendar they've shared with you. No email account needed.</p>
+      ${state.accounts.length ? `<p>For a Gmail account's own calendar, click the account in the sidebar and paste its
+      <b>Secret address in iCal format</b> from Google Calendar's settings.</p>` : ''}
       <p class="muted">The addresses are stored encrypted on this computer and only sent to the calendar's own server.</p>
     </div>`;
     return;

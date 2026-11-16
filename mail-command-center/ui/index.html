@@ -106,7 +106,7 @@
   <div id="cal-backdrop" class="modal-backdrop" hidden>
     <form id="cal-modal" class="modal-form" autocomplete="off">
       <h2 id="cal-title">Add a calendar</h2>
-      <p class="secure-note" style="margin:0">For calendars that aren't one of your Gmail accounts, like your personal iCloud calendar. Any calendar with an iCal (.ics or webcal://) link works.</p>
+      <p class="secure-note" style="margin:0">For any calendar with an iCal (.ics or webcal://) link, with no email account needed: your personal iCloud calendar, or a colleague's calendar.</p>
       <label>Name
         <input id="c-label" placeholder="e.g. Personal, Family" required />
       </label>
@@ -121,6 +121,11 @@
         <p><b>iCloud.com:</b> open Calendar, click the share icon next to the calendar → turn on <b>Public Calendar</b> → <b>Copy Link</b>.</p>
         <p>A public calendar link lets anyone who has it see the calendar's events, so keep it private. Turning Public Calendar off later stops the link from working.</p>
         <p><b>Outlook.com:</b> Settings → Calendar → Shared calendars → <b>Publish a calendar</b> → copy the <b>ICS</b> link.</p>
+      </details>
+      <details class="help">
+        <summary>Adding a colleague's calendar?</summary>
+        <p>Ask them for their calendar's link. In <b>Google Calendar</b>, they open ⚙ Settings → their calendar → Integrate calendar, and send you either the <b>Secret address in iCal format</b> (shows their event details; only for people they trust) or, if they've made the calendar public, the <b>Public address in iCal format</b>. On <b>iCloud</b> they share a Public Calendar link.</p>
+        <p>A calendar someone has shared with your Google account can't be added this way; the link has to come from them.</p>
       </details>
       <label>Color</label>
       <div id="c-colors"></div>
