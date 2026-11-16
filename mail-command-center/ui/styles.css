@@ -157,20 +157,25 @@ label.check { flex-direction: row !important; align-items: center; gap: 8px !imp
 #update-banner span { color: var(--muted); }
 #update-banner button { padding: 7px 10px; border-radius: 7px; border: 0; }
 
-/* ---------- Calendar nav item ---------- */
-#nav-calendar { margin-bottom: 2px; }
-.cal-icon {
-  width: 14px; height: 14px; flex: none; margin: 0 1px 0 0;
-  border: 2px solid var(--muted); border-top-width: 4px; border-radius: 3px;
+/* ---------- Mail | Calendar switch (top of sidebar) ---------- */
+.view-toggle {
+  display: flex; margin: 0 2px 8px; padding: 3px; gap: 3px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 9px;
 }
-#nav-calendar.active .cal-icon, #nav-calendar:hover .cal-icon { border-color: var(--text); }
-
-/* ---------- Mail | Calendar switch in the account header ---------- */
-.seg { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; margin-right: 4px; }
-.seg button { border: 0; background: transparent; color: var(--muted); padding: 3px 10px; font-size: 12px; }
-.seg button + button { border-left: 1px solid var(--line); }
-.seg button:hover { color: var(--text); }
-.seg button.on { background: var(--panel-2); color: var(--text); box-shadow: inset 0 -2px 0 var(--tile-color, var(--accent)); }
+.view-toggle button {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 7px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-weight: 550;
+}
+.view-toggle button:hover { color: var(--text); }
+.view-toggle button.on { background: var(--panel-2); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
+.mail-icon, .cal-icon { width: 14px; height: 12px; flex: none; border: 2px solid currentColor; border-radius: 2px; opacity: .85; }
+.mail-icon { background: linear-gradient(to bottom right, transparent 46%, currentColor 47% 53%, transparent 54%) top left / 50% 100% no-repeat,
+                         linear-gradient(to bottom left, transparent 46%, currentColor 47% 53%, transparent 54%) top right / 50% 100% no-repeat; }
+.cal-icon { height: 14px; border-top-width: 4px; border-radius: 3px; }
+.cal-icon.all { color: var(--muted); }
+#nav-calendar[hidden] { display: none; }
+#nav-calendar { margin-bottom: 2px; }
+#nav-calendar.active .cal-icon.all, #nav-calendar:hover .cal-icon.all { color: var(--text); }
 .icon-btn[hidden] { display: none; }
 
 /* ---------- Combined calendar page ---------- */

@@ -6,16 +6,23 @@ const COLORS = ['#4f8cff', '#30a46c', '#e5484d', '#f5a524', '#8e4ec6', '#12a594'
 const $ = (s) => document.querySelector(s);
 let state = { accounts: [] };
 const live = {}; // id -> { unread, email, error }
-let selectedId = null; // the one account shown, or CAL_PAGE
+let selectedId = null; // the one account shown, or CAL_PAGE ("All calendars")
 const CAL_PAGE = '__calendar__';
-const modes = {}; // account id -> 'mail' | 'calendar'
+let viewMode = 'mail'; // 'mail' | 'calendar': what every account shows
+let lastAccountId = null; // the account to return to from "All calendars"
 let calData = { events: [], errors: [], updatedAt: null, loading: false, days: 14 };
 const IS_MAC = /Mac/i.test(navigator.platform || navigator.userAgent);
 const ENCRYPTED_WITH = IS_MAC ? "your Mac's Keychain" : 'your Windows login';
 
-// Remember the open account between launches (per-PC convenience only).
+// Remember the open account and Mail/Calendar view between launches
+// (per-PC convenience only).
 const SELECTED_KEY = 'mcc.selected';
-try { selectedId = localStorage.getItem(SELECTED_KEY); } catch { /* storage unavailable */ }
+const VIEW_KEY = 'mcc.view';
+try {
+  selectedId = lastAccountId = localStorage.getItem(SELECTED_KEY);
+  if (localStorage.getItem(VIEW_KEY) === 'calendar') viewMode = 'calendar';
+} catch { /* storage unavailable */ }
+const remember = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } };
 
 // ---------- Layout sync ----------
 let rafPending = false;
@@ -28,7 +35,7 @@ function syncLayout() {
     document.querySelectorAll('.tile').forEach((tile) => {
       if (tile.offsetParent === null) return; // hidden
       const id = tile.dataset.id;
-      if (live[id]?.error && (modes[id] || 'mail') === 'mail') return;
+      if (live[id]?.error && viewMode === 'mail') return;
       const r = tile.querySelector('.slot').getBoundingClientRect();
       rects[id] = { x: r.x, y: r.y, width: r.width, height: r.height };
     });
@@ -41,9 +48,14 @@ window.addEventListener('resize', syncLayout);
 // ---------- Rendering ----------
 function render() {
   const { accounts } = state;
-  // Always show something: the calendar page, or an account that still exists.
-  if (selectedId !== CAL_PAGE && !accounts.some((a) => a.id === selectedId)) selectedId = accounts[0]?.id ?? null;
+  // Always show something: an account that still exists, or (in Calendar
+  // view only) the combined "All calendars" page.
+  const exists = (id) => accounts.some((a) => a.id === id);
+  if (selectedId === CAL_PAGE && viewMode !== 'calendar') selectedId = lastAccountId;
+  if (selectedId !== CAL_PAGE && !exists(selectedId)) selectedId = exists(lastAccountId) ? lastAccountId : accounts[0]?.id ?? null;
   $('#empty').hidden = accounts.length > 0;
+  document.querySelectorAll('#view-toggle [data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === viewMode));
+  $('#nav-calendar').hidden = viewMode !== 'calendar';
   $('#nav-calendar').classList.toggle('active', selectedId === CAL_PAGE);
   $('#agenda').hidden = selectedId !== CAL_PAGE;
   $('#tiles').hidden = selectedId === CAL_PAGE;
@@ -104,10 +116,6 @@ function makeTile(a) {
       <span class="name"></span>
       <span class="email"></span>
       <span class="badge"></span>
-      <span class="seg" role="group" aria-label="Show">
-        <button data-act="mode-mail">Mail</button>
-        <button data-act="mode-calendar">Calendar</button>
-      </span>
       <span class="actions">
         <button class="icon-btn" data-act="compose" title="Compose">✎</button>
         <button class="icon-btn" data-act="back" title="Back">←</button>
@@ -122,8 +130,7 @@ function makeTile(a) {
     const id = t.dataset.id;
     if (!btn) return;
     const act = btn.dataset.act;
-    if (act === 'mode-mail' || act === 'mode-calendar') setMode(id, act === 'mode-calendar' ? 'calendar' : 'mail');
-    else if (act === 'edit') openModal(state.accounts.find((x) => x.id === id));
+    if (act === 'edit') openModal(state.accounts.find((x) => x.id === id));
     else if (act === 'compose') window.mcc.action(id, 'compose');
     else {
       if (act === 'reload' && live[id]) delete live[id].error;
@@ -143,19 +150,24 @@ function updateTile(t, a) {
   const b = t.querySelector('.badge');
   b.textContent = info.unread ? info.unread.toLocaleString() : '';
   b.hidden = !info.unread;
-  const mode = modes[a.id] || 'mail';
-  t.querySelector('[data-act="mode-mail"]').classList.toggle('on', mode === 'mail');
-  t.querySelector('[data-act="mode-calendar"]').classList.toggle('on', mode === 'calendar');
+  const mode = viewMode;
   t.querySelector('[data-act="compose"]').hidden = mode !== 'mail';
   t.querySelector('[data-act="home"]').title = mode === 'mail' ? 'Inbox' : 'Calendar home';
   const slot = t.querySelector('.slot');
   slot.innerHTML = info.error && mode === 'mail' ? `<div class="error">Couldn't load: ${escapeHtml(info.error)}<br>Use ↻ to retry.</div>` : '';
 }
 
-function setMode(id, mode) {
-  modes[id] = mode;
-  window.mcc.setMode(id, mode);
+// Switch every account between Mail and Calendar, staying on the same account.
+// Each account's calendar page is created the first time it's shown.
+function setViewMode(mode) {
+  viewMode = mode;
+  remember(VIEW_KEY, mode);
+  if (selectedId === CAL_PAGE && mode !== 'calendar') selectedId = lastAccountId;
   render();
+  if (selectedId && selectedId !== CAL_PAGE) {
+    window.mcc.setMode(selectedId, viewMode);
+    window.mcc.action(selectedId, 'focus');
+  }
 }
 
 // ---------- Combined calendar ----------
@@ -348,7 +360,7 @@ function renderAgenda() {
       row.querySelector('.meta').textContent = [a.label, e.location].filter(Boolean).join(' · ');
       if (a.kind === 'account') {
         row.title = `Open ${a.label}'s calendar`;
-        row.onclick = () => { select(a.id); setMode(a.id, 'calendar'); };
+        row.onclick = () => select(a.id);
       } else {
         row.classList.add('no-link');
         row.title = `From ${a.label}`;
@@ -365,13 +377,14 @@ const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '
 // ---------- Switch account ----------
 function select(id) {
   selectedId = id;
-  try { localStorage.setItem(SELECTED_KEY, id); } catch { /* storage unavailable */ }
+  if (id !== CAL_PAGE) { lastAccountId = id; remember(SELECTED_KEY, id); }
   render();
   if (id === CAL_PAGE) {
     // Fetch fresh events if the last refresh is more than 5 minutes old.
     if (feedsTotal() && (!calData.updatedAt || Date.now() - new Date(calData.updatedAt) > 5 * 60000)) window.mcc.refreshCalendars();
     return;
   }
+  window.mcc.setMode(id, viewMode);
   window.mcc.action(id, 'focus');
 }
 
@@ -485,6 +498,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#mod
 $('#btn-add').onclick = () => openModal();
 $('#btn-add-empty').onclick = () => openModal();
 $('#nav-calendar').onclick = () => select(CAL_PAGE);
+document.querySelectorAll('#view-toggle [data-view]').forEach((b) => { b.onclick = () => setViewMode(b.dataset.view); });
 $('#btn-cal-refresh').onclick = () => window.mcc.refreshCalendars();
 window.mcc.on('calendars:update', (data) => { calData = data; render(); });
 setInterval(() => { if (selectedId === CAL_PAGE) render(); else renderCalendarNav(); }, 60000); // keep "updated … ago" and today's count current
@@ -526,4 +540,5 @@ window.mcc.on('update:available', ({ version }) => {
   Object.assign(live, state.live || {});
   calData = await window.mcc.getCalendars();
   render();
+  if (viewMode === 'calendar' && selectedId && selectedId !== CAL_PAGE) window.mcc.setMode(selectedId, 'calendar');
 })();

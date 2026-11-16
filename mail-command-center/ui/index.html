@@ -16,11 +16,16 @@
       </div>
     </div>
 
-    <button id="nav-calendar" class="nav-item">
-      <span class="cal-icon" aria-hidden="true"></span>
+    <div id="view-toggle" class="view-toggle" role="group" aria-label="Show">
+      <button data-view="mail"><span class="mail-icon" aria-hidden="true"></span>Mail</button>
+      <button data-view="calendar"><span class="cal-icon" aria-hidden="true"></span>Calendar</button>
+    </div>
+
+    <button id="nav-calendar" class="nav-item" hidden>
+      <span class="cal-icon all" aria-hidden="true"></span>
       <span class="meta">
-        <div class="name">Calendar</div>
-        <div class="email" id="cal-sub">All accounts</div>
+        <div class="name">All calendars</div>
+        <div class="email" id="cal-sub">Every account</div>
       </span>
     </button>
 
